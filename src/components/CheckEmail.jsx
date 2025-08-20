@@ -4,18 +4,17 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEnvelope, FaRedoAlt, FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
-import {
-  sendEmailVerification,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
+import { sendEmailVerification } from "firebase/auth";
 import { auth } from "@/config/Firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 const CheckEmail = ({ email, password }) => {
   const navigate = useNavigate();
 
   const handleResendEmail = async () => {
     try {
-      // Sign in the user first
+      // Since the user is logged out after registration, we need to sign them in temporarily
+      // to resend the verification email, then immediately sign them out
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
@@ -24,13 +23,13 @@ const CheckEmail = ({ email, password }) => {
 
       // Send verification email to the user
       await sendEmailVerification(userCredential.user, {
-        url: `${window.location.origin}/login`, // Where to redirect after verification
+        url: `${window.location.origin}/verifyemail`,
       });
 
       toast.success("Verification email resent successfully!");
       console.log("Resending verification email to:", email);
 
-      // Sign out the user after sending verification
+      // Immediately sign out the user to prevent header from appearing
       await auth.signOut();
     } catch (error) {
       console.error("Error resending verification email:", error);

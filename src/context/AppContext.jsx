@@ -120,11 +120,21 @@ export function UseAppContextProvider({ children }) {
 
       // 4. Send verification email
       await sendEmailVerification(user, {
-        url: `${window.location.origin}/login`,
+        url: `${window.location.origin}/verifyemail`,
       });
 
-      // 5. Logout user (optional)
+      // 5. Temporarily store password for auto-login after verification
+      // This will be cleared after successful login or after 1 hour
+      localStorage.setItem(`tempPassword_${user.email}`, customerData.password);
+
+      // Set a timeout to clear the stored password after 1 hour for security
+      setTimeout(() => {
+        localStorage.removeItem(`tempPassword_${user.email}`);
+      }, 60 * 60 * 1000); // 1 hour
+
+      // 6. Logout user and clear user state
       await signOut(auth);
+      setUser(null); // Explicitly clear user state to prevent header from appearing
 
       return {
         success: true,
@@ -259,31 +269,42 @@ export function UseAppContextProvider({ children }) {
 
     const authUnsubscribe = onAuthStateChanged(auth, (currentuser) => {
       if (currentuser) {
-        console.log("aa");
-        console.log(currentuser);
-        const usersDocRef = doc(db, "users", currentuser.uid);
+        console.log("Auth state changed - user:", currentuser);
 
-        const userDocUnsubscribe = onSnapshot(
-          usersDocRef,
-          (snapshot) => {
-            const data = snapshot.data();
+        // Only proceed if the user's email is verified (for non-admin users)
+        if (
+          currentuser.emailVerified ||
+          currentuser.email === "admin@gtl.com"
+        ) {
+          const usersDocRef = doc(db, "users", currentuser.uid);
 
-            if (data?.uid) {
-              setUser(data);
+          const userDocUnsubscribe = onSnapshot(
+            usersDocRef,
+            (snapshot) => {
+              const data = snapshot.data();
+
+              if (data?.uid) {
+                setUser(data);
+                setLoading(false);
+              } else {
+                setLoading(false);
+                logOut();
+              }
+            },
+            (error) => {
+              console.error("Error fetching user doc:", error);
               setLoading(false);
-            } else {
-              setLoading(false);
-              logOut();
             }
-          },
-          (error) => {
-            console.error("Error fetching user doc:", error);
-            setLoading(false);
-          }
-        );
+          );
 
-        // Optional: return unsubscribe for user doc snapshot
-        return userDocUnsubscribe;
+          // Optional: return unsubscribe for user doc snapshot
+          return userDocUnsubscribe;
+        } else {
+          // User is not verified, don't set user state
+          console.log("User email not verified, not setting user state");
+          setLoading(false);
+          setUser(null);
+        }
       } else {
         logOut();
         setLoading(false);

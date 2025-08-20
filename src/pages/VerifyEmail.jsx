@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { applyActionCode, checkActionCode } from "firebase/auth";
+import {
+  applyActionCode,
+  checkActionCode,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import {
   FaEnvelope,
   FaCheckCircle,
@@ -11,12 +15,15 @@ import {
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { auth } from "@/config/Firebase";
+import { useAppContext } from "../context/AppContext";
 
 const VerifyEmail = () => {
   const [status, setStatus] = useState("checking"); // checking, verified, invalid, error
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
+  const { signIn } = useAppContext();
 
   useEffect(() => {
     const verifyEmail = async () => {
@@ -38,8 +45,35 @@ const VerifyEmail = () => {
         setStatus("verified");
         toast.success("Email verified successfully!");
 
-        // Redirect after 3 seconds
-        setTimeout(() => navigate("/login"), 3000);
+        // Automatically sign in the user and redirect to home page
+        try {
+          // Get the user's password from localStorage (if available) or prompt for it
+          const storedPassword = localStorage.getItem(
+            `tempPassword_${info.data.email}`
+          );
+
+          if (storedPassword) {
+            // Auto-login with stored password
+            const result = await signIn(info.data.email, storedPassword);
+            if (result.success) {
+              // Clear the stored password
+              localStorage.removeItem(`tempPassword_${info.data.email}`);
+              // Redirect to home page
+              setTimeout(() => navigate("/"), 2000);
+            } else {
+              // If auto-login fails, redirect to login page
+              setTimeout(() => navigate("/login"), 3000);
+            }
+          } else {
+            // No stored password, show message and redirect to login page
+            toast.info("Please log in with your credentials");
+            setTimeout(() => navigate("/login"), 3000);
+          }
+        } catch (error) {
+          console.error("Auto-login failed:", error);
+          // Redirect to login page if auto-login fails
+          setTimeout(() => navigate("/login"), 3000);
+        }
       } catch (error) {
         console.error("Verification error:", error);
         setStatus(
@@ -84,7 +118,7 @@ const VerifyEmail = () => {
                 : "Your email has been verified."}
             </p>
             <div className="mt-4 flex items-center justify-center text-sm text-gray-500">
-              <span>Redirecting to login</span>
+              <span>Redirecting to home page</span>
               <FaArrowRight className="ml-1.5 h-3 w-3" />
             </div>
           </div>
@@ -103,10 +137,10 @@ const VerifyEmail = () => {
               This verification link has expired or is invalid.
             </p>
             <button
-              onClick={() => navigate("/resend-verification")}
+              onClick={() => navigate("/register")}
               className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              Get New Verification Link
+              Register Again
             </button>
           </div>
         );

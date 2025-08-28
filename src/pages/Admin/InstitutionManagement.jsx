@@ -13,8 +13,8 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
-const InstitutionManagement = () => {
-  const [institutions, setInstitutions] = useState([]);
+const BusinessManagement = () => {
+  const [institutiones, setBusinesses] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [verificationStatus, setVerificationStatus] = useState("all");
   const { user } = useAppContext();
@@ -23,32 +23,32 @@ const InstitutionManagement = () => {
   const [showSearchesModal, setShowSearchesModal] = useState(false);
   const [showProposalsModal, setShowProposalsModal] = useState(false);
   const [showPurchasesModal, setShowPurchasesModal] = useState(false);
-  const [currentInstitution, setCurrentInstitution] = useState(null);
+  const [currentBusiness, setCurrentBusiness] = useState(null);
   const [searches, setSearches] = useState([]);
   const [proposals, setProposals] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [ploading, setPloading] = useState(false);
 
-  // ✅ Fetch institutions (type = institution) from Firestore
+  // ✅ Fetch institutiones (type = institution) from Firestore
   useEffect(() => {
-    const fetchInstitutions = async () => {
+    const fetchBusinesses = async () => {
       try {
         const q = query(
           collection(db, "users"),
-          where("type", "==", "institution")
+          where("type", "==", "business")
         );
         const querySnapshot = await getDocs(q);
-        const fetchedInstitutions = querySnapshot.docs.map((doc) => ({
+        const fetchedBusinesses = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
-        setInstitutions(fetchedInstitutions);
+        setBusinesses(fetchedBusinesses);
       } catch (error) {
-        console.error("Error fetching institutions:", error);
+        console.error("Error fetching institutiones:", error);
       }
     };
 
-    fetchInstitutions();
+    fetchBusinesses();
   }, []);
 
   // ✅ Fetch institution's searches
@@ -146,13 +146,15 @@ const InstitutionManagement = () => {
   // ✅ Toggle verification and update Firestore
   const toggleVerification = async (institutionId) => {
     try {
-      const updatedInstitutions = institutions.map((inst) =>
-        inst.id === institutionId ? { ...inst, isActive: !inst.isActive } : inst
+      const updatedBusinesses = institutiones.map((institution) =>
+        institution.id === institutionId
+          ? { ...institution, isActive: !institution.isActive }
+          : institution
       );
-      setInstitutions(updatedInstitutions);
+      setBusinesses(updatedBusinesses);
 
-      const institutionToUpdate = updatedInstitutions.find(
-        (i) => i.id === institutionId
+      const institutionToUpdate = updatedBusinesses.find(
+        (institution) => institution.id === institutionId
       );
       if (institutionToUpdate) {
         await updateDoc(doc(db, "users", institutionId), {
@@ -165,24 +167,24 @@ const InstitutionManagement = () => {
   };
 
   // ✅ Search and filter by status
-  const filteredInstitutions = institutions.filter((inst) => {
+  const filteredBusinesses = institutiones.filter((institution) => {
     const matchesSearch =
-      inst.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inst.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      institution.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      institution.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus =
       verificationStatus === "all" ||
-      (verificationStatus === "verified" && inst.isActive) ||
-      (verificationStatus === "unverified" && !inst.isActive);
+      (verificationStatus === "verified" && institution.isActive) ||
+      (verificationStatus === "unverified" && !institution.isActive);
     return matchesSearch && matchesStatus;
   });
 
   if (!user || user.type !== "admin") {
     return <div className="text-center py-8">Admin access required</div>;
-  }
+  } 
 
   return (
     <div className="max-w-6xl mx-auto py-8">
-      <h2 className="text-2xl font-semibold mb-6">Institution Management</h2>
+      <h2 className="text-2xl font-semibold mb-6">Business Management</h2>
 
       <div className="bg-white p-6 rounded-lg shadow-md mb-6">
         <div className="grid md:grid-cols-3 gap-4 mb-6">
@@ -192,7 +194,7 @@ const InstitutionManagement = () => {
             </label>
             <input
               type="text"
-              placeholder="Search institutions..."
+              placeholder="Search businesses..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="p-2 border border-gray-300 rounded w-full"
@@ -207,14 +209,14 @@ const InstitutionManagement = () => {
               onChange={(e) => setVerificationStatus(e.target.value)}
               className="p-2 border border-gray-300 rounded w-full"
             >
-              <option value="all">All Institutions</option>
+              <option value="all">All Businesses</option>
               <option value="verified">Verified Only</option>
               <option value="unverified">Unverified Only</option>
             </select>
           </div>
           <div className="flex items-end">
             <span className="text-gray-600">
-              {filteredInstitutions.length} institutions found
+              {filteredBusinesses.length} businesses found
             </span>
           </div>
         </div>
@@ -224,7 +226,7 @@ const InstitutionManagement = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Institution
+                  Business
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Contact
@@ -238,52 +240,56 @@ const InstitutionManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredInstitutions.map((inst) => (
-                <tr key={inst.id}>
+              {filteredBusinesses.map((institution) => (
+                <tr key={institution.id}>
                   <td className="px-6 py-4">
                     <div className="text-sm font-medium text-gray-900">
-                      {inst.name}
+                      {institution.name}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {inst.organizationType || "N/A"}
+                      {institution.organizationType || "N/A"}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">{inst.email}</div>
-                    <div className="text-sm text-gray-500">
-                      {inst.phone || "N/A"}
+                    <div className="text-sm text-gray-900">
+                      {institution.email}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {inst.address || "N/A"}
+                      {institution.phone || "N/A"}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {institution.address || "N/A"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        inst.isActive
+                        institution.isActive
                           ? "bg-green-100 text-green-800"
                           : "bg-yellow-100 text-yellow-800"
                       }`}
                     >
-                      {inst.isActive ? "Verified" : "Pending Verification"}
+                      {institution.isActive
+                        ? "Verified"
+                        : "Pending Verification"}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex flex-col space-y-2">
                       <button
-                        onClick={() => toggleVerification(inst.id)}
+                        onClick={() => toggleVerification(institution.id)}
                         className={`text-left ${
-                          inst.isActive
+                          institution.isActive
                             ? "text-yellow-600 hover:text-yellow-900"
                             : "text-green-600 hover:text-green-900"
                         }`}
                       >
-                        {inst.isActive ? "Unverify" : "Verify"}
+                        {institution.isActive ? "Unverify" : "Verify"}
                       </button>
                       <button
                         onClick={() => {
-                          setCurrentInstitution(inst);
-                          fetchSearches(inst.id);
+                          setCurrentBusiness(institution);
+                          fetchSearches(institution.id);
                         }}
                         className="text-blue-600 hover:text-blue-900 text-left"
                       >
@@ -291,8 +297,8 @@ const InstitutionManagement = () => {
                       </button>
                       <button
                         onClick={() => {
-                          setCurrentInstitution(inst);
-                          fetchProposals(inst.id);
+                          setCurrentBusiness(institution);
+                          fetchProposals(institution.id);
                         }}
                         disabled={ploading}
                         className="text-purple-600 hover:text-purple-900 text-left"
@@ -301,8 +307,8 @@ const InstitutionManagement = () => {
                       </button>
                       <button
                         onClick={() => {
-                          setCurrentInstitution(inst);
-                          fetchPurchases(inst.id);
+                          setCurrentBusiness(institution);
+                          fetchPurchases(institution.id);
                         }}
                         className="text-indigo-600 hover:text-indigo-900 text-left"
                       >
@@ -324,7 +330,7 @@ const InstitutionManagement = () => {
             <div className="bg-white border-black border-2 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold">
-                  Searches for {currentInstitution?.name}
+                  Searches for {currentBusiness?.name}
                 </h3>
                 <button
                   onClick={() => setShowSearchesModal(false)}
@@ -392,7 +398,7 @@ const InstitutionManagement = () => {
                 </div>
               ) : (
                 <p className="text-gray-500">
-                  No searches found for this institution.
+                  No searches found for this business.
                 </p>
               )}
             </div>
@@ -406,7 +412,7 @@ const InstitutionManagement = () => {
           <div className="bg-white border-black border-2 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">
-                Proposals for {currentInstitution?.name}
+                Proposals for {currentBusiness?.name}
               </h3>
               <button
                 onClick={() => setShowProposalsModal(false)}
@@ -496,7 +502,7 @@ const InstitutionManagement = () => {
               </div>
             ) : (
               <p className="text-gray-500">
-                No proposals found for this institution.
+                No proposals found for this business.
               </p>
             )}
           </div>
@@ -509,7 +515,7 @@ const InstitutionManagement = () => {
           <div className="bg-white border-black border-2 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">
-                Purchases for {currentInstitution?.name}
+                Purchases for {currentBusiness?.name}
               </h3>
               <button
                 onClick={() => setShowPurchasesModal(false)}
@@ -586,7 +592,7 @@ const InstitutionManagement = () => {
               </div>
             ) : (
               <p className="text-gray-500">
-                No purchases found for this institution.
+                No purchases found for this business.
               </p>
             )}
           </div>
@@ -596,4 +602,4 @@ const InstitutionManagement = () => {
   );
 };
 
-export default InstitutionManagement;
+export default BusinessManagement;

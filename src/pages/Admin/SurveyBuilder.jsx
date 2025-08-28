@@ -2,9 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
-import { useSurveyContext } from "../../context/SurveyContext";
 import { db } from "@/config/Firebase";
-import { collection, getDocs, setDoc, doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  setDoc,
+  doc,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+} from "firebase/firestore";
 
 const SurveyBuilder = () => {
   const [editingSurvey, setEditingSurvey] = useState(null);
@@ -16,9 +24,12 @@ const SurveyBuilder = () => {
     is_required: false,
   });
   const [tempOption, setTempOption] = useState("");
+  const [surveys, setSurveys] = useState([]);
+  const [filteredSurveys, setFilteredSurveys] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const { user } = useAppContext();
-  const { surveys, fetchSurveys, createSurvey, updateSurvey } =
-    useSurveyContext();
 
   // Comprehensive standardized questions based on international regulatory standards
   const standardizedQuestions = [
@@ -335,10 +346,117 @@ const SurveyBuilder = () => {
     },
   ];
 
-  // ✅ Fetch surveys using SurveyContext
+  // Fetch all surveys for admin (unfiltered)
+  const fetchSurveys = async () => {
+    try {
+      setLoading(true);
+      const surveysQuery = collection(db, "surveys");
+      const surveysSnapshot = await getDocs(surveysQuery);
+      const surveysData = surveysSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setSurveys(surveysData);
+    } catch (error) {
+      console.error("Error fetching surveys:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create a new survey
+  const createSurvey = async (surveyData) => {
+    try {
+      const docRef = await addDoc(collection(db, "surveys"), {
+        ...surveyData,
+        status: "active",
+        participantsCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      console.log("Survey created with ID:", docRef.id);
+      await fetchSurveys(); // Refresh the list
+      return docRef.id;
+    } catch (error) {
+      console.error("Error creating survey:", error);
+      throw error;
+    }
+  };
+
+  // Update an existing survey
+  const updateSurvey = async (surveyId, surveyData) => {
+    try {
+      const surveyRef = doc(db, "surveys", surveyId);
+      await updateDoc(surveyRef, {
+        ...surveyData,
+        updatedAt: new Date().toISOString(),
+      });
+      console.log("Survey updated successfully");
+      await fetchSurveys(); // Refresh the list
+    } catch (error) {
+      console.error("Error updating survey:", error);
+      throw error;
+    }
+  };
+
+  // Toggle survey status (active/inactive)
+  const handleToggleSurveyStatus = async (surveyId, newStatus) => {
+    try {
+      const surveyRef = doc(db, "surveys", surveyId);
+      await updateDoc(surveyRef, {
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+      });
+      console.log(`Survey ${surveyId} status changed to ${newStatus}`);
+      await fetchSurveys(); // Refresh the list
+    } catch (error) {
+      console.error("Error toggling survey status:", error);
+    }
+  };
+
+  // Delete a survey
+  const handleDeleteSurvey = async (surveyId) => {
+    if (
+      window.confirm(
+        "Are you sure you want to delete this survey? This action cannot be undone."
+      )
+    ) {
+      try {
+        const surveyRef = doc(db, "surveys", surveyId);
+        await deleteDoc(surveyRef);
+        console.log(`Survey ${surveyId} deleted successfully`);
+        await fetchSurveys(); // Refresh the list
+      } catch (error) {
+        console.error("Error deleting survey:", error);
+      }
+    }
+  };
+
+  // Filter surveys based on search term and status
+  useEffect(() => {
+    let filtered = surveys;
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (survey) =>
+          survey.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          survey.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Filter by status
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((survey) => survey.status === statusFilter);
+    }
+
+    setFilteredSurveys(filtered);
+  }, [surveys, searchTerm, statusFilter]);
+
+  // ✅ Fetch surveys on component mount
   useEffect(() => {
     fetchSurveys();
-  }, [fetchSurveys]);
+  }, []);
 
   // ✅ Create a new survey
   const handleCreateNewSurvey = () => {
@@ -477,13 +595,92 @@ const SurveyBuilder = () => {
             </div>
           </div>
 
-          {surveys.length === 0 ? (
+          {/* Survey Summary */}
+          <div className="bg-white p-4 rounded-lg shadow-md mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {surveys.length}
+                </div>
+                <div className="text-sm text-blue-800">Total Surveys</div>
+              </div>
+              <div className="bg-green-50 p-3 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {surveys.filter((s) => s.status === "active").length}
+                </div>
+                <div className="text-sm text-green-800">Active Surveys</div>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-2xl font-bold text-gray-600">
+                  {surveys.filter((s) => s.status === "inactive").length}
+                </div>
+                <div className="text-sm text-gray-800">Inactive Surveys</div>
+              </div>
+              <div className="bg-yellow-50 p-3 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-600">
+                  {surveys.reduce(
+                    (sum, s) => sum + (s.participantsCount || 0),
+                    0
+                  )}
+                </div>
+                <div className="text-sm text-yellow-800">
+                  Total Participants
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filter Controls */}
+          <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search surveys by title or description..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="p-2 border border-gray-300 rounded"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+                <button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setStatusFilter("all");
+                  }}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
             <div className="bg-white p-6 rounded-lg shadow-md text-center">
-              <p className="text-gray-500">No surveys created yet.</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading surveys...</p>
+            </div>
+          ) : filteredSurveys.length === 0 ? (
+            <div className="bg-white p-6 rounded-lg shadow-md text-center">
+              <p className="text-gray-500">
+                {surveys.length === 0
+                  ? "No surveys created yet."
+                  : "No surveys match your search criteria."}
+              </p>
             </div>
           ) : (
             <div className="grid md:grid-cols-2 gap-6">
-              {surveys.map((survey) => (
+              {filteredSurveys.map((survey) => (
                 <div
                   key={survey.id}
                   className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow"
@@ -497,11 +694,22 @@ const SurveyBuilder = () => {
                         {survey.description || "No description"}
                       </p>
                     </div>
-                    {survey.isDefault && (
-                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                        Default
+                    <div className="flex flex-col gap-2">
+                      {survey.isDefault && (
+                        <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                          Default
+                        </span>
+                      )}
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          survey.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {survey.status || "inactive"}
                       </span>
-                    )}
+                    </div>
                   </div>
                   <div className="mb-3">
                     <div className="flex gap-4 text-sm text-gray-600 mb-2">
@@ -510,20 +718,63 @@ const SurveyBuilder = () => {
                         {survey.targetParticipants || 0} participants
                       </span>
                       <span className="flex items-center">
+                        <span className="font-medium">Current:</span>{" "}
+                        {survey.participantsCount || 0} participants
+                      </span>
+                      <span className="flex items-center">
                         <span className="font-medium">Reward:</span> $
                         {survey.reward || "0.00"}
+                      </span>
+                    </div>
+                    <div className="flex gap-4 text-sm text-gray-600 mb-2">
+                      <span className="flex items-center">
+                        <span className="font-medium">Created:</span>{" "}
+                        {survey.createdAt
+                          ? new Date(survey.createdAt).toLocaleDateString()
+                          : "Unknown"}
+                      </span>
+                      <span className="flex items-center">
+                        <span className="font-medium">Updated:</span>{" "}
+                        {survey.updatedAt
+                          ? new Date(survey.updatedAt).toLocaleDateString()
+                          : "Unknown"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-500">
                         {survey.questions.length} questions
                       </span>
-                      <button
-                        onClick={() => setEditingSurvey(survey)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingSurvey(survey)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleToggleSurveyStatus(
+                              survey.id,
+                              survey.status === "active" ? "inactive" : "active"
+                            )
+                          }
+                          className={`px-3 py-1 rounded text-sm ${
+                            survey.status === "active"
+                              ? "bg-orange-600 hover:bg-orange-700 text-white"
+                              : "bg-green-600 hover:bg-green-700 text-white"
+                          }`}
+                        >
+                          {survey.status === "active"
+                            ? "Deactivate"
+                            : "Activate"}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSurvey(survey.id)}
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

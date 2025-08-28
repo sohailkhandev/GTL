@@ -41,7 +41,7 @@ export default function PaymentSuccess() {
           setLoading(false);
           // If payment is completed, redirect after some time
           if (docSnap.data().status === "completed") {
-            setTimeout(() => navigate("/institution/dashboard"), 5000);
+            setTimeout(() => navigate("/business/dashboard"), 5000);
           }
         } else {
           setError("Order not found");
@@ -140,7 +140,7 @@ export default function PaymentSuccess() {
               <span className="font-semibold">{order.id}</span> has expired.
             </p>
             <button
-              onClick={() => navigate("/institution/licenses")}
+              onClick={() => navigate("/business/licenses")}
               className="mt-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200 transition"
             >
               Back to Licenses
@@ -167,7 +167,7 @@ export default function PaymentSuccess() {
               </p>
             )}
             <button
-              onClick={() => navigate("/institution/licenses")}
+              onClick={() => navigate("/business/licenses")}
               className="mt-2 px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition"
             >
               Try Again
@@ -189,7 +189,7 @@ export default function PaymentSuccess() {
               <span className="font-semibold">{order.id}</span>.
             </p>
             <button
-              onClick={() => navigate("/institution/licenses")}
+              onClick={() => navigate("/business/licenses")}
               className="mt-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition"
             >
               Back to Licenses
@@ -225,7 +225,7 @@ export default function PaymentSuccess() {
               </div>
               <p className="text-red-700 mb-4">{error}</p>
               <button
-                onClick={() => navigate("/institution/licenses")}
+                onClick={() => navigate("/business/licenses")}
                 className="mt-2 px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition"
               >
                 Back to Licenses

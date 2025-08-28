@@ -63,7 +63,7 @@ const PaymentSuccess = () => {
 
           // Redirect to dashboard after 5 seconds
           setTimeout(() => {
-            navigate("/institution/dashboard");
+            navigate("/business/dashboard");
           }, 5000);
         } else {
           setErrorMessage(result.error || "Failed to add points");
@@ -121,7 +121,7 @@ const PaymentSuccess = () => {
               <span>Redirecting to dashboard in 5 seconds...</span>
             </div>
             <button
-              onClick={() => navigate("/institution/dashboard")}
+              onClick={() => navigate("/business/dashboard")}
               className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Go to Dashboard Now
@@ -150,7 +150,7 @@ const PaymentSuccess = () => {
                 Try Again
               </button>
               <button
-                onClick={() => navigate("/institution/licenses")}
+                onClick={() => navigate("/business/licenses")}
                 className="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Back to Purchase Page

@@ -1,7 +1,8 @@
-// Institution Survey Responses - allows institutions to view responses to their surveys
+// Institution Survey Responses - allows institutiones to view responses to their surveys
 
 import { useState, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
+import { useSurveyContext } from "../../context/SurveyContext";
 import { db } from "@/config/Firebase";
 import {
   collection,
@@ -17,9 +18,11 @@ const SurveyResponses = () => {
   const [selectedSurvey, setSelectedSurvey] = useState(null);
   const [surveys, setSurveys] = useState([]);
   const { user } = useAppContext();
+  const { checkAndCloseCompletedSurveys, isCheckingQuotas } =
+    useSurveyContext();
 
   useEffect(() => {
-    if (!user || user.type !== "institution") return;
+    if (!user || user.type !== "business") return;
 
     // Fetch institution's surveys
     const fetchSurveys = async () => {
@@ -43,7 +46,7 @@ const SurveyResponses = () => {
   }, [user]);
 
   useEffect(() => {
-    if (!user || user.type !== "institution") return;
+    if (!user || user.type !== "business") return;
 
     // Set up real-time listener for survey responses
     const responsesQuery = query(
@@ -84,13 +87,72 @@ const SurveyResponses = () => {
     return survey ? survey.title : "Unknown Survey";
   };
 
-  if (!user || user.type !== "institution") {
+  const getSurveyStatus = (surveyId) => {
+    const survey = surveys.find((s) => s.id === surveyId);
+    if (!survey) return null;
+
+    const isQuotaReached =
+      survey.participantsCount >= survey.targetParticipants;
+
+    switch (survey.status) {
+      case "active":
+        if (isQuotaReached) {
+          return {
+            text: "Quota Full",
+            bgColor: "bg-orange-100 text-orange-800",
+            description: "Target participants reached",
+          };
+        }
+        return {
+          text: "Active",
+          bgColor: "bg-green-100 text-green-800",
+          description: "Accepting participants",
+        };
+      case "paused":
+        return {
+          text: "Paused",
+          bgColor: "bg-yellow-100 text-yellow-800",
+          description: "Temporarily paused",
+        };
+      case "completed":
+        return {
+          text: "Completed",
+          bgColor: "bg-blue-100 text-blue-800",
+          description: "Survey closed - quota reached",
+        };
+      default:
+        return {
+          text: survey.status || "Active",
+          bgColor: "bg-gray-100 text-gray-800",
+          description: "Unknown status",
+        };
+    }
+  };
+
+  const getSurveyQuotaInfo = (surveyId) => {
+    const survey = surveys.find((s) => s.id === surveyId);
+    if (!survey) return null;
+
+    return {
+      current: survey.participantsCount || 0,
+      target: survey.targetParticipants || 0,
+      percentage: survey.targetParticipants
+        ? Math.round(
+            (survey.participantsCount / survey.targetParticipants) * 100
+          )
+        : 0,
+      isQuotaReached:
+        (survey.participantsCount || 0) >= (survey.targetParticipants || 0),
+    };
+  };
+
+  if (!user || user.type !== "business") {
     return (
       <div className="max-w-4xl mx-auto py-8 text-center">
         <h2 className="text-2xl font-semibold mb-4">
-          Institution access required
+          Business access required
         </h2>
-        <p>Please login with an institution account to access this feature.</p>
+        <p>Please login with a business account to access this feature.</p>
       </div>
     );
   }
@@ -105,7 +167,93 @@ const SurveyResponses = () => {
 
   return (
     <div className="max-w-6xl mx-auto py-8">
-      <h2 className="text-2xl font-semibold mb-6">Survey Responses</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-semibold">Survey Responses</h2>
+        <button
+          onClick={checkAndCloseCompletedSurveys}
+          disabled={isCheckingQuotas}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm disabled:bg-blue-400 disabled:cursor-not-allowed"
+          title="Check and close surveys that have reached their quota"
+        >
+          {isCheckingQuotas ? "Checking..." : "Check Quotas"}
+        </button>
+      </div>
+
+      {/* Survey Overview */}
+      <div className="mb-8">
+        <h3 className="text-lg font-medium mb-4">Survey Overview</h3>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {surveys.map((survey) => {
+            const statusInfo = getSurveyStatus(survey.id);
+            const quotaInfo = getSurveyQuotaInfo(survey.id);
+
+            return (
+              <div
+                key={survey.id}
+                className={`bg-white p-4 rounded-lg shadow-md border ${
+                  survey.status === "completed"
+                    ? "border-l-4 border-l-blue-500"
+                    : "border-gray-200"
+                }`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-medium text-gray-900 truncate">
+                    {survey.title}
+                  </h4>
+                  {statusInfo && (
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${statusInfo.bgColor}`}
+                    >
+                      {statusInfo.text}
+                    </span>
+                  )}
+                </div>
+
+                {quotaInfo && (
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-600">
+                      Participants: {quotaInfo.current} / {quotaInfo.target}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          quotaInfo.isQuotaReached
+                            ? "bg-blue-600"
+                            : quotaInfo.percentage >= 80
+                            ? "bg-orange-500"
+                            : "bg-green-500"
+                        }`}
+                        style={{
+                          width: `${Math.min(quotaInfo.percentage, 100)}%`,
+                        }}
+                      ></div>
+                    </div>
+
+                    <div className="text-xs text-gray-500">
+                      {quotaInfo.percentage}% complete
+                    </div>
+
+                    {quotaInfo.isQuotaReached && survey.status === "active" && (
+                      <div className="text-xs text-orange-600 font-medium">
+                        ⚠️ Quota reached - will auto-close
+                      </div>
+                    )}
+
+                    {survey.status === "completed" && survey.completedAt && (
+                      <div className="text-xs text-blue-600">
+                        ✓ Completed on{" "}
+                        {new Date(survey.completedAt).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {surveyResponses.length === 0 ? (
         <div className="bg-white p-6 rounded-lg shadow-md text-center">
@@ -116,71 +264,108 @@ const SurveyResponses = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          {surveyResponses.map((response) => (
-            <div
-              key={response.id}
-              className="bg-white p-6 rounded-lg shadow-md border border-gray-200"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {getSurveyTitle(response.surveyId)}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    Respondent:{" "}
-                    {response.respondentName || response.respondentId}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Submitted: {formatDate(response.date)}
-                  </p>
-                </div>
-                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                  New Response
-                </span>
-              </div>
+          {surveyResponses.map((response) => {
+            const survey = surveys.find((s) => s.id === response.surveyId);
+            const statusInfo = survey ? getSurveyStatus(survey.id) : null;
+            const quotaInfo = survey ? getSurveyQuotaInfo(survey.id) : null;
 
-              {response.answers && Object.keys(response.answers).length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="font-medium text-gray-700">Responses:</h4>
-                  {Object.entries(response.answers).map(
-                    ([questionId, answer]) => (
-                      <div key={questionId} className="bg-gray-50 p-3 rounded">
-                        <p className="text-sm text-gray-600 mb-1">
-                          <strong>Question ID:</strong> {questionId}
-                        </p>
-                        <p className="text-sm text-gray-800">
-                          <strong>Answer:</strong>{" "}
-                          {Array.isArray(answer) ? answer.join(", ") : answer}
-                        </p>
-                      </div>
-                    )
+            return (
+              <div
+                key={response.id}
+                className={`bg-white p-6 rounded-lg shadow-md border ${
+                  survey?.status === "completed"
+                    ? "border-l-4 border-l-blue-500"
+                    : "border-gray-200"
+                }`}
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {getSurveyTitle(response.surveyId)}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Respondent:{" "}
+                      {response.respondentName || response.respondentId}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Submitted: {formatDate(response.date)}
+                    </p>
+                    {quotaInfo && (
+                      <p className="text-sm text-gray-500">
+                        Survey Progress: {quotaInfo.current} /{" "}
+                        {quotaInfo.target} participants
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end space-y-2">
+                    {statusInfo && (
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${statusInfo.bgColor}`}
+                      >
+                        {statusInfo.text}
+                      </span>
+                    )}
+                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                      New Response
+                    </span>
+                  </div>
+                </div>
+
+                {response.answers &&
+                  Object.keys(response.answers).length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-gray-700">Responses:</h4>
+                      {Object.entries(response.answers).map(
+                        ([questionId, answer]) => (
+                          <div
+                            key={questionId}
+                            className="bg-gray-50 p-3 rounded"
+                          >
+                            <p className="text-sm text-gray-600 mb-1">
+                              <strong>Question ID:</strong> {questionId}
+                            </p>
+                            <p className="text-sm text-gray-800">
+                              <strong>Answer:</strong>{" "}
+                              {Array.isArray(answer)
+                                ? answer.join(", ")
+                                : answer}
+                            </p>
+                          </div>
+                        )
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
 
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">
-                    Response ID: {response.id}
-                  </span>
-                  <button
-                    onClick={() => {
-                      // Here you could implement actions like:
-                      // - Request genetic sampling
-                      // - Send follow-up questions
-                      // - Mark as reviewed
-                      alert(
-                        "Feature: Request genetic sampling or send follow-up questions"
-                      );
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-                  >
-                    Take Action
-                  </button>
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">
+                      Response ID: {response.id}
+                    </span>
+                    {survey?.status !== "completed" ? (
+                      <button
+                        onClick={() => {
+                          // Here you could implement actions like:
+                          // - Request genetic sampling
+                          // - Send follow-up questions
+                          // - Mark as reviewed
+                          alert(
+                            "Feature: Request genetic sampling or send follow-up questions"
+                          );
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                      >
+                        Take Action
+                      </button>
+                    ) : (
+                      <span className="text-sm text-gray-500 font-medium">
+                        Survey completed - no new actions available
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

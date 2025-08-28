@@ -1,276 +1,179 @@
-// this is page from where the user will participate in survey
-
-import { useState, useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/config/Firebase";
 import { useAppContext } from "../../context/AppContext";
 import { useSurveyContext } from "../../context/SurveyContext";
-import { db, functions } from "@/config/Firebase";
-import { collection, query, getDocs, addDoc, where } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import ReCAPTCHA from "react-google-recaptcha";
-import { getSurveys } from "../../services/surveyService";
+import AdminSurvey from "../../components/AdminSurvey";
+import ProgressiveJackpot from "../../components/ProgressiveJackpot";
+import { addDocument } from "@/utils/database.utils";
+import { processSurveyCompletion } from "../../services/jackpotService";
+const STEPS = [
+  { id: 1, title: "Intro" },
+  { id: 2, title: "Questions" },
+  { id: 3, title: "Review" },
+  { id: 4, title: "Terms" },
+  { id: 5, title: "Submit" },
+];
 
 const ParticipateSurvey = () => {
+  const { user, refreshUserData } = useAppContext();
+  const { surveys, fetchSurveys } = useSurveyContext();
+
   const [currentSurvey, setCurrentSurvey] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1);
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const [recaptchaToken, setRecaptchaToken] = useState(null);
-  const [geneticConsentAccepted, setGeneticConsentAccepted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [surveyConsentAccepted, setSurveyConsentAccepted] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const { user } = useAppContext();
-  const { surveys, fetchSurveys } = useSurveyContext();
-  const recaptchaRef = useRef();
+  const [showAdminSurveys, setShowAdminSurveys] = useState(false);
 
-  // Standardized questions based on international regulatory standards
-  const standardizedQuestions = [
-    {
-      id: "std-consent",
-      text: "I confirm that I have read and understood the research purpose and compensation conditions",
-      description:
-        "This includes understanding that the genetic testing kit is provided free of charge and results will be shared",
-      type: "checkbox",
-      options: ["I confirm"],
-      is_required: true,
-    },
-    {
-      id: "std-age",
-      text: "What is your age?",
-      description: "Must be 18 or older to participate",
-      type: "number",
-      is_required: true,
-    },
-    {
-      id: "std-gender",
-      text: "What is your gender?",
-      description: "For research purposes only",
-      type: "multiple_choice",
-      options: ["Male", "Female", "Other", "Prefer not to say"],
-      is_required: true,
-    },
-    {
-      id: "std-ethnicity",
-      text: "What is your ethnic background?",
-      description: "This helps ensure diverse representation in research",
-      type: "multiple_choice",
-      options: [
-        "White/Caucasian",
-        "Black/African American",
-        "Hispanic/Latino",
-        "Asian",
-        "Native American",
-        "Pacific Islander",
-        "Mixed",
-        "Other",
-        "Prefer not to say",
-      ],
-      is_required: true,
-    },
-    {
-      id: "std-medical-history",
-      text: "Do you have any known medical conditions?",
-      description: "Please select all that apply",
-      type: "checkbox",
-      options: [
-        "Diabetes",
-        "Hypertension",
-        "Heart Disease",
-        "Cancer",
-        "Autoimmune Disorders",
-        "Mental Health Conditions",
-        "None",
-        "Other (please specify)",
-      ],
-      is_required: true,
-    },
-    {
-      id: "std-medications",
-      text: "Are you currently taking any medications?",
-      description: "This is important for research safety",
-      type: "multiple_choice",
-      options: [
-        "Yes, prescription medications",
-        "Yes, over-the-counter medications",
-        "Yes, supplements",
-        "No medications",
-        "Prefer not to say",
-      ],
-      is_required: true,
-    },
-    {
-      id: "std-genetic-testing",
-      text: "Have you had genetic testing before?",
-      description: "Previous genetic testing experience",
-      type: "multiple_choice",
-      options: [
-        "Yes, for health reasons",
-        "Yes, for ancestry",
-        "Yes, for research",
-        "No",
-        "Unsure",
-      ],
-      is_required: true,
-    },
-    {
-      id: "std-family-history",
-      text: "Do you have a family history of genetic conditions?",
-      description: "This helps researchers understand genetic patterns",
-      type: "multiple_choice",
-      options: [
-        "Yes, cancer",
-        "Yes, heart disease",
-        "Yes, neurological conditions",
-        "Yes, other genetic conditions",
-        "No known family history",
-        "Unsure",
-      ],
-      is_required: true,
-    },
-  ];
-
-  // Fetch available surveys using SurveyContext
   useEffect(() => {
-    if (user && user.type === "user" && user.isActive) {
+    if (!user) return;
+    if (user.type !== "user" || !user.isActive) return;
+    if (user.member === "not a member") {
+      setShowAdminSurveys(true);
+    } else {
+      setShowAdminSurveys(false);
       fetchSurveys();
     }
   }, [user, fetchSurveys]);
+
+  const handleAdminSurveyComplete = async () => {
+    setShowAdminSurveys(false);
+    await refreshUserData();
+    fetchSurveys();
+  };
 
   const handleSurveySelect = (survey) => {
     setCurrentSurvey(survey);
     setAnswers({});
     setSubmitted(false);
-    setRecaptchaToken(null);
-    setGeneticConsentAccepted(false);
+    setSurveyConsentAccepted(false);
     setTermsAccepted(false);
-    if (recaptchaRef.current) {
-      recaptchaRef.current.reset();
-    }
+    setCurrentStep(1);
   };
 
   const handleAnswerChange = (questionId, value) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: value,
-    }));
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
-  const allRequiredQuestionsAnswered = () => {
+  const allRequiredQuestionsAnswered = useMemo(() => {
     if (!currentSurvey) return false;
-
-    // Check standardized questions
-    const standardizedRequired = standardizedQuestions.every((question) => {
-      if (!question.is_required) return true;
-      const answer = answers[question.id];
-      if (question.type === "checkbox") {
-        return answer && answer.length > 0;
-      }
-      return answer !== undefined && answer !== null && answer !== "";
+    const ok = currentSurvey.questions.every((q) => {
+      if (!q.is_required) return true;
+      const a = answers[q.id];
+      if (q.type === "checkbox") return Array.isArray(a) && a.length > 0;
+      return a !== undefined && a !== null && String(a).trim() !== "";
     });
+    return ok && termsAccepted && surveyConsentAccepted;
+  }, [currentSurvey, answers, termsAccepted, surveyConsentAccepted]);
 
-    // Check survey-specific questions
-    const surveyRequired = currentSurvey.questions.every((question) => {
-      if (!question.is_required) return true;
-      const answer = answers[question.id];
-      if (question.type === "checkbox") {
-        return answer && answer.length > 0;
-      }
-      return answer !== undefined && answer !== null && answer !== "";
-    });
-
-    return (
-      standardizedRequired &&
-      surveyRequired &&
-      termsAccepted &&
-      geneticConsentAccepted
-    );
+  const canProceedFromStep = (step) => {
+    switch (step) {
+      case 1: // Intro - always can proceed
+        return true;
+      case 2: // Questions - check if ALL questions are answered (both required and optional)
+        return (
+          currentSurvey &&
+          currentSurvey.questions &&
+          currentSurvey.questions.every((q) => {
+            const a = answers[q.id];
+            if (q.type === "checkbox") {
+              return a && Array.isArray(a) && a.length > 0;
+            }
+            if (q.type === "multiple_choice" || q.type === "dropdown") {
+              return a !== undefined && a !== null && String(a).trim() !== "";
+            }
+            return a !== undefined && a !== null && String(a).trim() !== "";
+          })
+        );
+      case 3: // Review - always can proceed
+        return true;
+      case 4: // Terms - check if terms accepted
+        return termsAccepted && surveyConsentAccepted;
+      case 5: // Submit - always can proceed
+        return true;
+      default:
+        return false;
+    }
   };
 
-  const handleRecaptchaChange = (token) => {
-    setRecaptchaToken(token);
+  const nextStep = () => {
+    if (!canProceedFromStep(currentStep)) return;
+    setCurrentStep((s) => Math.min(s + 1, STEPS.length));
   };
 
-  const handleRecaptchaExpired = () => {
-    setRecaptchaToken(null);
-  };
-
-  const handleRecaptchaError = () => {
-    setRecaptchaToken(null);
-  };
+  const prevStep = () => setCurrentStep((s) => Math.max(s - 1, 1));
 
   const submitSurvey = async () => {
-    if (!currentSurvey || !user || !recaptchaToken) return;
-
+    if (!currentSurvey || !user) return;
+    setLoading(true);
     try {
-      const submitSurvey = httpsCallable(functions, "submitEncryptedSurvey");
-      const res = await submitSurvey({
+      const submitFn = httpsCallable(functions, "submitEncryptedSurvey");
+      const res = await submitFn({
         surveyId: currentSurvey.id,
         userId: user.uid,
         answers,
-        recaptchaToken,
-        geneticConsentAccepted,
+        surveyConsentAccepted,
         termsAccepted,
       });
 
-      if (res.data.success) {
-        // Create notification for institution if this is an institution survey
-        if (currentSurvey.isInstitutionSurvey && currentSurvey.institutionId) {
+      if (res?.data?.success) {
+        if (currentSurvey.isBusinessSurvey && currentSurvey.institutionId) {
           try {
-            await addDoc(collection(db, "notifications"), {
-              userId: currentSurvey.institutionId,
-              message: `New survey response received for "${
-                currentSurvey.title
-              }" from ${user.name || user.email}`,
-              type: "survey_response",
-              surveyId: currentSurvey.id,
-              respondentId: user.uid,
-              respondentName: user.name || user.email,
-              date: new Date(),
-              read: false,
+            await addDocument({
+              collectionName: "notifications",
+              data: {
+                userId: currentSurvey.institutionId,
+                message: `New survey response received for "${currentSurvey.title}" from ${user.name}`,
+                timestamp: new Date().toISOString(),
+                type: "survey_response",
+                read: false,
+              },
             });
-          } catch (notificationError) {
-            console.error("Error creating notification:", notificationError);
-          }
+          } catch {}
         }
 
+        try {
+          const r = await processSurveyCompletion(
+            user.uid,
+            currentSurvey.id,
+            currentSurvey.institutionId || "admin"
+          );
+          if (!r?.success) console.error("Failed to process survey completion");
+        } catch {}
+
         setSubmitted(true);
-        setRecaptchaToken(null);
-        if (recaptchaRef.current) {
-          recaptchaRef.current.reset();
-        }
+        try {
+          await refreshUserData();
+        } catch {}
+        try {
+          await fetchSurveys();
+        } catch {}
       } else {
-        alert(res.data.message);
+        alert(res?.data?.message || "Submission failed");
       }
-    } catch (error) {
-      console.error("Error submitting survey:", error);
+    } catch (e) {
+      console.error(e);
       alert("Failed to submit survey. Please try again.");
-      if (recaptchaRef.current) {
-        recaptchaRef.current.reset();
-      }
-      setRecaptchaToken(null);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!recaptchaToken) {
-      alert("Please complete the reCAPTCHA verification");
+    if (!allRequiredQuestionsAnswered) {
+      alert("Please answer all required questions and accept the terms.");
       return;
     }
-
-    if (!allRequiredQuestionsAnswered()) {
-      alert(
-        "Please answer all required questions and accept the terms and conditions"
-      );
-      return;
-    }
-
     await submitSurvey();
   };
 
-  const goback = () => {
-    window.location.reload();
-  };
+  const goback = () => window.location.reload();
 
-  // User type check
   if (!user || user.type !== "user") {
     return (
       <div className="max-w-4xl mx-auto py-8 text-center">
@@ -281,7 +184,6 @@ const ParticipateSurvey = () => {
     );
   }
 
-  // Show if user is inactive
   if (user && !user.isActive) {
     return (
       <div className="max-w-4xl mx-auto py-8 text-center">
@@ -293,57 +195,10 @@ const ParticipateSurvey = () => {
     );
   }
 
-  // Show confirmation message
-  if (submitted) {
+  if (showAdminSurveys) {
     return (
       <div className="max-w-4xl mx-auto py-8">
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
-          <h2 className="font-bold text-xl mb-2">
-            Thank you for your submission!
-          </h2>
-          <p>Your survey responses have been recorded securely.</p>
-          <p className="mt-2 font-medium">
-            The company will now have access to your registered information and
-            will send the genetic testing kit to your address.
-          </p>
-        </div>
-        <button
-          onClick={goback}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-        >
-          Back to Available Surveys
-        </button>
-      </div>
-    );
-  }
-
-  // Survey participation form
-  if (currentSurvey) {
-    return (
-      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto py-8">
-        <button
-          type="button"
-          onClick={() => setCurrentSurvey(null)}
-          className="mb-6 text-blue-600 hover:underline flex items-center"
-        >
-          <svg
-            className="w-5 h-5 mr-1"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
-          Back to surveys
-        </button>
-
-        {/* Company Information Section */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-6 shadow-sm">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
           <div className="flex items-center mb-4">
             <div className="bg-blue-600 text-white p-2 rounded-full mr-3">
               <svg
@@ -356,542 +211,801 @@ const ParticipateSurvey = () => {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-blue-800">
-              Company Information
+            <h3 className="text-lg font-semibold text-blue-800">
+              Membership Upgrade Required
             </h3>
           </div>
-
-          {/* Free Genetic Testing Notice */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-            <div className="flex items-center">
-              <div className="bg-green-500 text-white p-1.5 rounded-full mr-3">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-              <div>
-                <p className="text-green-800 font-semibold text-sm">
-                  FREE Genetic Testing Kit Included
-                </p>
-                <p className="text-green-700 text-xs">
-                  Complete genetic testing kit at no cost to you
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <div className="bg-white p-3 rounded border border-blue-200">
-              <label className="block text-sm font-medium text-blue-700 mb-1">
-                Company Name
-              </label>
-              <p className="text-gray-900 font-medium text-sm">
-                {currentSurvey.institutionName || "Research Institution"}
-              </p>
-            </div>
-
-            <div className="bg-white p-3 rounded border border-blue-200">
-              <label className="block text-sm font-medium text-blue-700 mb-1">
-                Research Purpose
-              </label>
-              <p className="text-gray-900 text-sm leading-tight">
-                {currentSurvey.researchPurpose ||
-                  currentSurvey.description ||
-                  "Genetic research and analysis for scientific advancement"}
-              </p>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-blue-700 mb-2">
-              Compensation Conditions
-            </label>
-            <div className="bg-white p-3 rounded border border-blue-200">
-              <p className="text-xs font-medium text-red-600 mb-2 border-b border-red-200 pb-1">
-                IMPORTANT: Please read carefully before participating
-              </p>
-              <ul className="text-xs text-gray-700 space-y-1">
-                <li className="flex items-start">
-                  <span className="text-green-600 font-bold mr-1">•</span>
-                  <span>
-                    <strong>Free Genetic Testing Kit:</strong> Provided
-                    completely free of charge
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-green-600 font-bold mr-1">•</span>
-                  <span>
-                    <strong>Results Sharing:</strong> Genetic analysis results
-                    will be shared with you
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-green-600 font-bold mr-1">•</span>
-                  <span>
-                    <strong>No Additional Costs:</strong> No hidden fees or
-                    charges
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 font-bold mr-1">•</span>
-                  <span>
-                    <strong>Shipping Included:</strong> Kit shipped to your
-                    registered address
-                  </span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="bg-white p-3 rounded border border-blue-200">
-            <label className="block text-sm font-medium text-blue-700 mb-1">
-              Sponsorship Amount
-            </label>
-            <div className="flex items-center space-x-2">
-              <span className="text-lg font-bold text-green-600 bg-green-50 px-2 py-1 rounded border">
-                ${currentSurvey.sponsorshipAmount || "80.00"}
-              </span>
-              <span className="text-xs text-gray-600">(Range: $80 - $999)</span>
-            </div>
-            <p className="text-xs text-gray-600 mt-1">
-              Higher amounts increase participation likelihood
-            </p>
-          </div>
-        </div>
-
-        <h2 className="text-2xl font-semibold mb-4">{currentSurvey.title}</h2>
-        <p className="mb-6 text-gray-600">{currentSurvey.description}</p>
-
-        {/* Standardized Questions Section */}
-        <div className="mb-8">
-          <h3 className="text-xl font-semibold mb-4 text-gray-800 border-b border-gray-200 pb-2">
-            Standardized Questions (International Regulatory Standards)
-          </h3>
-          <p className="text-sm text-gray-600 mb-4">
-            These questions are based on international regulatory standards to
-            ensure research compliance and participant safety.
+          <p className="text-blue-700">
+            To participate in surveys and earn rewards, you must first complete
+            two membership surveys.
           </p>
+        </div>
+        <AdminSurvey onComplete={handleAdminSurveyComplete} user={user} />
+      </div>
+    );
+  }
 
-          <div className="space-y-6">
-            {standardizedQuestions.map((question) => (
-              <div
-                key={question.id}
-                className="bg-gray-50 p-4 rounded-lg border border-gray-200"
+  if (submitted) {
+    return (
+      <div className="max-w-4xl mx-auto py-8">
+        <div className="bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-xl mb-6 shadow-lg">
+          <div className="flex items-center mb-3">
+            <div className="bg-green-500 text-white p-2 rounded-full mr-3">
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <div className="mb-2">
-                  <h3 className="font-medium">
-                    {question.text}
-                    {question.is_required && (
-                      <span className="text-red-500 ml-1">*</span>
-                    )}
-                  </h3>
-                  {question.description && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      {question.description}
-                    </p>
-                  )}
-                </div>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+            <h2 className="font-bold text-2xl">
+              Survey Completed Successfully!
+            </h2>
+          </div>
+          <p className="text-lg mb-2">
+            Your survey responses have been recorded securely.
+          </p>
+          <p className="font-medium">
+            You've earned{" "}
+            <span className="text-green-600 font-bold">
+              {currentSurvey?.pointsReward ?? 20} points
+            </span>
+            .
+          </p>
+        </div>
+        <div className="flex gap-4 justify-center">
+          <button
+            onClick={goback}
+            className="bg-[#2069BA] hover:bg-[#1e40af] text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+          >
+            Back to Available Surveys
+          </button>
+          <Link
+            to="/dashboard"
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+          >
+            View Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-                {question.type === "text" && (
-                  <input
-                    type="text"
-                    className="w-full p-2 border border-gray-300 rounded"
-                    value={answers[question.id] || ""}
-                    onChange={(e) =>
-                      handleAnswerChange(question.id, e.target.value)
-                    }
-                    required={question.is_required}
-                  />
+  if (currentSurvey) {
+    const pct =
+      Math.round(
+        ((currentSurvey.participantsCount || 0) /
+          (currentSurvey.targetParticipants || 1)) *
+          100 || 0
+      ) || 0;
+
+    return (
+      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto py-8">
+        <div className="flex justify-between items-center mb-6">
+          <button
+            type="button"
+            onClick={() => setCurrentSurvey(null)}
+            className="text-[#2069BA] hover:text-[#1e40af] hover:underline flex items-center font-semibold transition-colors duration-200"
+          >
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            Back to surveys
+          </button>
+        </div>
+
+        {/* Step Progress Indicator */}
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Step {currentStep} of {STEPS.length}:{" "}
+                {STEPS[currentStep - 1].title}
+              </h2>
+              <span className="text-sm text-gray-500">
+                {STEPS[currentStep - 1].title === "Intro" &&
+                  "Survey Overview & Company Info"}
+                {STEPS[currentStep - 1].title === "Questions" &&
+                  "Answer Survey Questions"}
+                {STEPS[currentStep - 1].title === "Review" &&
+                  "Review Your Answers"}
+                {STEPS[currentStep - 1].title === "Terms" &&
+                  "Accept Terms & Conditions"}
+                {STEPS[currentStep - 1].title === "Submit" &&
+                  "Final Confirmation & Submit"}
+              </span>
+            </div>
+
+            {/* Step Progress Bar */}
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+              <div
+                className="bg-[#2069BA] h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(currentStep / STEPS.length) * 100}%` }}
+              ></div>
+            </div>
+
+            {/* Step Navigation */}
+            <div className="flex items-center justify-between">
+              <div className="flex space-x-2">
+                {STEPS.map((step) => (
+                  <button
+                    key={step.id}
+                    onClick={() => setCurrentStep(step.id)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+                      step.id === currentStep
+                        ? "bg-[#2069BA] text-white"
+                        : step.id < currentStep
+                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                  >
+                    {step.id}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex space-x-3">
+                {currentStep > 1 && (
+                  <button
+                    onClick={prevStep}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-all duration-200"
+                  >
+                    ← Previous
+                  </button>
                 )}
-                {question.type === "number" && (
-                  <input
-                    type="number"
-                    className="w-full p-2 border border-gray-300 rounded"
-                    value={answers[question.id] || ""}
-                    onChange={(e) =>
-                      handleAnswerChange(question.id, e.target.value)
-                    }
-                    required={question.is_required}
-                    min="18"
-                    max="120"
-                  />
-                )}
-                {question.type === "multiple_choice" && (
-                  <div className="space-y-2">
-                    {question.options.map((option) => (
-                      <div key={option} className="flex items-center">
-                        <input
-                          type="radio"
-                          id={`${question.id}-${option}`}
-                          name={question.id}
-                          value={option}
-                          checked={answers[question.id] === option}
-                          onChange={() =>
-                            handleAnswerChange(question.id, option)
-                          }
-                          className="mr-2"
-                          required={
-                            question.is_required && !answers[question.id]
-                          }
-                        />
-                        <label htmlFor={`${question.id}-${option}`}>
-                          {option}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {question.type === "checkbox" && (
-                  <div className="space-y-2">
-                    {question.options.map((option) => (
-                      <div key={option} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`${question.id}-${option}`}
-                          checked={
-                            answers[question.id]?.includes(option) || false
-                          }
-                          onChange={(e) => {
-                            const current = answers[question.id] || [];
-                            const newValue = e.target.checked
-                              ? [...current, option]
-                              : current.filter((item) => item !== option);
-                            handleAnswerChange(question.id, newValue);
-                          }}
-                          className="mr-2"
-                        />
-                        <label htmlFor={`${question.id}-${option}`}>
-                          {option}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+
+                {currentStep < STEPS.length ? (
+                  <button
+                    onClick={nextStep}
+                    disabled={!canProceedFromStep(currentStep)}
+                    className={`px-4 py-2 rounded-md transition-all duration-200 ${
+                      canProceedFromStep(currentStep)
+                        ? "bg-[#2069BA] text-white hover:bg-[#1e40af]"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                  >
+                    Next →
+                  </button>
+                ) : (
+                  <button
+                    onClick={submitSurvey}
+                    disabled={!allRequiredQuestionsAnswered || loading}
+                    className={`px-4 py-2 rounded-md transition-all duration-200 ${
+                      allRequiredQuestionsAnswered && !loading
+                        ? "bg-green-600 text-white hover:bg-green-700"
+                        : "bg-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {loading ? "Submitting..." : "Submit Survey"}
+                  </button>
                 )}
               </div>
-            ))}
+            </div>
           </div>
-        </div>
 
-        {/* Survey-Specific Questions */}
-        {currentSurvey.questions && currentSurvey.questions.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold mb-4 text-gray-800 border-b border-gray-200 pb-2">
-              Additional Research Questions
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              These are additional questions specific to this research study.
-            </p>
-
-            <div className="space-y-6">
-              {currentSurvey.questions.map((question) => (
-                <div
-                  key={question.id}
-                  className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
-                >
-                  <div className="mb-2">
-                    <h3 className="font-medium">
-                      {question.text}
-                      {question.is_required && (
-                        <span className="text-red-500 ml-1">*</span>
-                      )}
+          {currentStep === 1 && (
+            <div className="mb-6">
+              <div className="bg-gradient-to-r from-[#2069BA]/10 to-[#1e40af]/10 border border-[#2069BA]/20 rounded-xl p-6 mb-8 shadow-lg">
+                <div className="flex items-center mb-6">
+                  <div className="bg-[#2069BA] text-white p-3 rounded-xl mr-4 shadow-lg">
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-[#2069BA]">
+                      {currentSurvey.businessName || "Research Company"}
                     </h3>
-                    {question.description && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        {question.description}
-                      </p>
-                    )}
+                    <p className="text-gray-600">
+                      Professional research institution conducting this survey
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-semibold text-gray-800 mb-2">
+                      Survey Details
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Title:</span>
+                        <span className="font-medium text-gray-800">
+                          {currentSurvey.title}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Category:</span>
+                        <span className="font-medium text-gray-800">
+                          {currentSurvey.category || "General"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Points Reward:</span>
+                        <span className="font-medium text-green-600">
+                          {currentSurvey.pointsReward ?? 20} points
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">
+                          Target Participants:
+                        </span>
+                        <span className="font-medium text-gray-800">
+                          {currentSurvey.targetParticipants || "Unlimited"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  {question.type === "text" && (
-                    <input
-                      type="text"
-                      className="w-full p-2 border border-gray-300 rounded"
-                      value={answers[question.id] || ""}
-                      onChange={(e) =>
-                        handleAnswerChange(question.id, e.target.value)
-                      }
-                      required={question.is_required}
-                    />
-                  )}
-                  {question.type === "number" && (
-                    <input
-                      type="number"
-                      className="w-full p-2 border border-gray-300 rounded"
-                      value={answers[question.id] || ""}
-                      onChange={(e) =>
-                        handleAnswerChange(question.id, e.target.value)
-                      }
-                      required={question.is_required}
-                    />
-                  )}
-                  {question.type === "multiple_choice" && (
-                    <div className="space-y-2">
-                      {question.options.map((option) => (
-                        <div key={option} className="flex items-center">
-                          <input
-                            type="radio"
-                            id={`${question.id}-${option}`}
-                            name={question.id}
-                            value={option}
-                            checked={answers[question.id] === option}
-                            onChange={() =>
-                              handleAnswerChange(question.id, option)
-                            }
-                            className="mr-2"
-                            required={
-                              question.is_required && !answers[question.id]
-                            }
-                          />
-                          <label htmlFor={`${question.id}-${option}`}>
-                            {option}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {question.type === "dropdown" && (
-                    <select
-                      className="w-full p-2 border border-gray-300 rounded"
-                      value={answers[question.id] || ""}
-                      onChange={(e) =>
-                        handleAnswerChange(question.id, e.target.value)
-                      }
-                      required={question.is_required}
-                    >
-                      <option value="" disabled>
-                        -- Select an option --
-                      </option>
-                      {question.options.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-
-                  {question.type === "checkbox" && (
-                    <div className="space-y-2">
-                      {question.options.map((option) => (
-                        <div key={option} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`${question.id}-${option}`}
-                            checked={
-                              answers[question.id]?.includes(option) || false
-                            }
-                            onChange={(e) => {
-                              const current = answers[question.id] || [];
-                              const newValue = e.target.checked
-                                ? [...current, option]
-                                : current.filter((item) => item !== option);
-                              handleAnswerChange(question.id, newValue);
-                            }}
-                            className="mr-2"
-                          />
-                          <label htmlFor={`${question.id}-${option}`}>
-                            {option}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div>
+                    <h4 className="font-semibold text-gray-800 mb-2">
+                      Research Purpose
+                    </h4>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {currentSurvey.researchPurpose ||
+                        "This research aims to gather insights to improve products and services."}
+                    </p>
+                  </div>
                 </div>
-              ))}
+              </div>
+
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-lg">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                  Welcome to the Survey!
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Thank you for participating. Your responses will help us
+                  gather valuable insights.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-800 mb-2">
+                    What to expect:
+                  </h4>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    <li>• Answer questions at your own pace</li>
+                    <li>
+                      • Earn {currentSurvey.pointsReward ?? 20} points upon
+                      completion
+                    </li>
+                    <li>• Your responses are confidential</li>
+                  </ul>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Terms and Conditions Section */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
-          <h3 className="text-xl font-semibold text-yellow-800 mb-4">
-            Terms and Conditions
-          </h3>
+          {currentStep === 2 && (
+            <>
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-lg mb-8">
+                <h2 className="text-3xl font-bold text-gray-800 mb-3">
+                  {currentSurvey.title}
+                </h2>
+                <p className="text-lg text-gray-600 leading-relaxed">
+                  {currentSurvey.description}
+                </p>
+              </div>
 
-          <div className="space-y-4">
-            <div className="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                id="terms-acceptance"
-                checked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                required
-              />
-              <label
-                htmlFor="terms-acceptance"
-                className="text-sm text-gray-700"
+              {currentSurvey.questions?.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-xl font-semibold mb-4 text-gray-800 border-b border-gray-200 pb-2">
+                    Research Questions
+                  </h3>
+                  <div className="space-y-6">
+                    {currentSurvey.questions.map((q) => (
+                      <div
+                        key={q.id}
+                        className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
+                      >
+                        <div className="mb-2">
+                          <h3 className="font-medium">
+                            {q.text}
+                            {q.is_required && (
+                              <span className="text-red-500 ml-1">*</span>
+                            )}
+                          </h3>
+                          {!!q.description && (
+                            <p className="text-sm text-gray-500 mt-1">
+                              {q.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {q.type === "text" && (
+                          <input
+                            type="text"
+                            className="w-full p-2 border border-gray-300 rounded"
+                            value={answers[q.id] || ""}
+                            onChange={(e) =>
+                              handleAnswerChange(q.id, e.target.value)
+                            }
+                          />
+                        )}
+
+                        {q.type === "number" && (
+                          <input
+                            type="number"
+                            className="w-full p-2 border border-gray-300 rounded"
+                            value={answers[q.id] || ""}
+                            onChange={(e) =>
+                              handleAnswerChange(q.id, e.target.value)
+                            }
+                          />
+                        )}
+
+                        {q.type === "multiple_choice" && (
+                          <div className="space-y-2">
+                            {(q.options || []).map((opt) => (
+                              <label
+                                key={opt}
+                                className="flex items-center gap-2"
+                              >
+                                <input
+                                  type="radio"
+                                  name={q.id}
+                                  value={opt}
+                                  checked={answers[q.id] === opt}
+                                  onChange={() => handleAnswerChange(q.id, opt)}
+                                />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+
+                        {q.type === "dropdown" && (
+                          <select
+                            className="w-full p-2 border border-gray-300 rounded"
+                            value={answers[q.id] || ""}
+                            onChange={(e) =>
+                              handleAnswerChange(q.id, e.target.value)
+                            }
+                          >
+                            <option value="" disabled>
+                              -- Select an option --
+                            </option>
+                            {(q.options || []).map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
+                        {q.type === "checkbox" && (
+                          <div className="space-y-2">
+                            {(q.options || []).map((opt) => {
+                              const arr = Array.isArray(answers[q.id])
+                                ? answers[q.id]
+                                : [];
+                              const checked = arr.includes(opt);
+                              return (
+                                <label
+                                  key={opt}
+                                  className="flex items-center gap-2"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(e) => {
+                                      const curr = Array.isArray(answers[q.id])
+                                        ? answers[q.id]
+                                        : [];
+                                      const next = e.target.checked
+                                        ? [...curr, opt]
+                                        : curr.filter((x) => x !== opt);
+                                      handleAnswerChange(q.id, next);
+                                    }}
+                                  />
+                                  <span>{opt}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {currentStep === 3 && (
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold mb-4 text-gray-800 border-b border-gray-200 pb-2">
+                Review Your Answers
+              </h3>
+              <div className="space-y-3">
+                {currentSurvey.questions.map((q) => {
+                  const a = answers[q.id];
+                  const display = Array.isArray(a)
+                    ? a.join(", ")
+                    : a !== undefined && a !== null
+                    ? String(a)
+                    : "—";
+                  return (
+                    <div key={q.id} className="bg-white p-4 rounded-lg border">
+                      <div className="text-sm text-gray-500 mb-1">{q.text}</div>
+                      <div className="font-medium text-gray-900">{display}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {currentStep === 4 && (
+            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-6 mb-8 shadow-lg">
+              <div className="flex items-center mb-6">
+                <div className="bg-yellow-500 text-white p-2 rounded-full mr-3">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-yellow-800">
+                  Terms and Conditions
+                </h3>
+              </div>
+
+              <div className="space-y-4">
+                <label className="flex items-start space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    className="mt-1 h-5 w-5 text-[#2069BA] focus:ring-[#2069BA] border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-700">
+                    I confirm that I have answered all survey questions
+                    sincerely and truthfully.
+                  </span>
+                </label>
+
+                <label className="flex items-start space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={surveyConsentAccepted}
+                    onChange={(e) => setSurveyConsentAccepted(e.target.checked)}
+                    className="mt-1 h-5 w-5 text-[#2069BA] focus:ring-[#2069BA] border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-700">
+                    I agree to participate and understand my responses will be
+                    used for research.
+                  </span>
+                </label>
+
+                <div className="bg-white p-4 rounded-xl border border-yellow-300 shadow-md">
+                  <p className="text-sm text-gray-800 mb-3 font-semibold">
+                    Important Information:
+                  </p>
+                  <ul className="text-sm text-gray-700 space-y-1 ml-4">
+                    <li>• Responses may be analyzed in aggregate</li>
+                    <li>• Basic demographics for matching</li>
+                    <li>• Contact for completion confirmation</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 5 && (
+            <div className="mb-8">
+              <div className="flex justify-between text-sm text-gray-600 mb-2">
+                <span>
+                  Current Participants: {currentSurvey.participantsCount || 0}
+                </span>
+                <span className="font-semibold">{pct}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div
+                  className={`h-2.5 rounded-full ${
+                    pct >= 100
+                      ? "bg-[#2069BA]"
+                      : pct >= 80
+                      ? "bg-orange-500"
+                      : "bg-green-500"
+                  }`}
+                  style={{ width: `${Math.min(pct, 100)}%` }}
+                />
+              </div>
+
+              <h1 className="text-2xl mt-6">ReCapcha Comes here </h1>
+              <button
+                type="submit"
+                disabled={!allRequiredQuestionsAnswered || loading}
+                className="mt-6 w-full bg-[#2069BA] hover:bg-[#1e40af] text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                I confirm that I have answered all survey questions sincerely
-                and truthfully. I understand that providing false information
-                may affect the research outcomes.
-              </label>
+                {loading ? "Submitting..." : "Submit Survey"}
+              </button>
             </div>
-
-            <div className="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                id="genetic-consent"
-                checked={geneticConsentAccepted}
-                onChange={(e) => setGeneticConsentAccepted(e.target.checked)}
-                className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                required
-              />
-              <label
-                htmlFor="genetic-consent"
-                className="text-sm text-gray-700"
-              >
-                I agree to provide my genetic information for research purposes
-                as described in this survey.
-              </label>
-            </div>
-
-            <div className="bg-white p-4 rounded border border-yellow-300">
-              <p className="text-sm text-gray-800 mb-3">
-                <strong>Important:</strong> By accepting these terms, you grant
-                the company access to your registered personal information,
-                including:
-              </p>
-              <ul className="text-sm text-gray-700 space-y-1 ml-4">
-                <li>• Your email address for communication</li>
-                <li>
-                  • Your shipping address for receiving the genetic testing kit
-                </li>
-                <li>• Your survey responses for research analysis</li>
-              </ul>
-              <p className="text-sm text-gray-800 mt-3">
-                The company will send the genetic testing kit directly to your
-                registered address.
-              </p>
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="space-y-2 mt-5">
-          <ReCAPTCHA
-            ref={recaptchaRef}
-            sitekey={import.meta.env.VITE_REACT_APP_RECAPCHA_SITE_KEY}
-            onChange={handleRecaptchaChange}
-            onExpired={handleRecaptchaExpired}
-            onErrored={handleRecaptchaError}
-          />
+        <div className="mt-6 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={prevStep}
+            disabled={currentStep === 1}
+            className="px-4 py-2 rounded-lg border font-semibold disabled:opacity-50"
+          >
+            Back
+          </button>
+          {currentStep < 5 && (
+            <button
+              type="button"
+              onClick={nextStep}
+              className={`px-6 py-2 rounded-lg font-semibold text-white ${
+                canProceedFromStep(currentStep)
+                  ? "bg-[#2069BA] hover:bg-[#1e40af]"
+                  : "bg-gray-400 cursor-not-allowed"
+              }`}
+              disabled={!canProceedFromStep(currentStep)}
+            >
+              Next
+            </button>
+          )}
         </div>
-
-        <button
-          type="submit"
-          disabled={!allRequiredQuestionsAnswered() || !recaptchaToken}
-          className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded disabled:bg-blue-300"
-        >
-          Submit Survey
-        </button>
       </form>
     );
   }
 
-  // Survey list
   return (
     <div className="max-w-4xl mx-auto py-8">
-      <h2 className="text-2xl font-semibold mb-6">Available Surveys</h2>
+      <div className="bg-gradient-to-r from-[#2069BA]/10 to-[#1e40af]/10 border border-[#2069BA]/20 rounded-xl p-6 mb-8 shadow-lg">
+        <h2 className="text-3xl font-bold text-[#2069BA] mb-3">
+          Available Surveys
+        </h2>
+        <p className="text-gray-600 text-lg">
+          Participate in research surveys to earn points and unlock rewards
+        </p>
+      </div>
+
+      <ProgressiveJackpot />
 
       {surveys.length === 0 ? (
-        <p className="text-gray-500">
-          No surveys available at the moment. Please check back later.
-        </p>
+        <div className="text-center py-12">
+          <div className="bg-gray-50 rounded-xl p-8 border border-gray-200">
+            <svg
+              className="w-16 h-16 text-gray-400 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            <p className="text-gray-500 text-lg">
+              No surveys available at the moment.
+            </p>
+            <p className="text-gray-400">
+              Please check back later for new opportunities.
+            </p>
+          </div>
+        </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
-          {surveys.map((survey) => (
-            <div
-              key={survey.id}
-              className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow"
-            >
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-xl font-semibold">{survey.title}</h3>
-                {survey.isInstitutionSurvey && (
-                  <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full whitespace-nowrap">
-                    {survey.institutionName || "Institution"}
-                  </span>
-                )}
-              </div>
-              <p className="text-gray-600 mb-4">{survey.description}</p>
+          {surveys.map((survey) => {
+            const isQuotaReached =
+              (survey.participantsCount || 0) >=
+              (survey.targetParticipants || Infinity);
+            const isCompleted = survey.status === "completed";
+            const canParticipate =
+              !survey.alreadySubmitted &&
+              !isCompleted &&
+              survey.status === "active";
+            const pct =
+              Math.round(
+                ((survey.participantsCount || 0) /
+                  (survey.targetParticipants || 1)) *
+                  100 || 0
+              ) || 0;
 
-              {/* Company Information Preview */}
-              {survey.isInstitutionSurvey && (
-                <div className="bg-blue-50 p-3 rounded mb-4">
-                  <div className="text-sm text-gray-700">
-                    <p>
-                      <strong>Company:</strong>{" "}
-                      {survey.institutionName || "Research Institution"}
+            return (
+              <div
+                key={survey.id}
+                className={`bg-white p-6 rounded-xl shadow-lg transition-all duration-300 border border-gray-200 ${
+                  isCompleted
+                    ? "border-l-4 border-l-[#2069BA] opacity-75"
+                    : "hover:border-[#2069BA]/30"
+                }`}
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-xl font-bold text-gray-800">
+                    {survey.title}
+                  </h3>
+                  <div className="flex flex-col items-end space-y-2">
+                    {survey.isBusinessSurvey && (
+                      <span className="bg-[#2069BA]/10 text-[#2069BA] text-xs px-3 py-1 rounded-full font-semibold border border-[#2069BA]/20">
+                        {survey.businessName || "Research Company"}
+                      </span>
+                    )}
+                    {isCompleted ? (
+                      <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-semibold">
+                        Completed
+                      </span>
+                    ) : isQuotaReached && survey.status === "active" ? (
+                      <span className="bg-orange-100 text-orange-800 text-xs px-3 py-1 rounded-full font-semibold">
+                        Quota Full
+                      </span>
+                    ) : survey.status === "paused" ? (
+                      <span className="bg-yellow-100 text-yellow-800 text-xs px-3 py-1 rounded-full font-semibold">
+                        Paused
+                      </span>
+                    ) : (
+                      <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-semibold">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-gray-600 mb-4 leading-relaxed">
+                  {survey.description}
+                </p>
+
+                {survey.isBusinessSurvey && (
+                  <div className="bg-[#2069BA]/5 p-4 rounded-xl mb-4 border border-[#2069BA]/20 text-sm text-gray-700">
+                    <p className="mb-2">
+                      <strong className="text-[#2069BA]">Company:</strong>{" "}
+                      {survey.businessName || ""}
                     </p>
-                    {survey.researchPurpose && (
-                      <p>
-                        <strong>Research:</strong>{" "}
+                    {!!survey.researchPurpose && (
+                      <p className="mb-2">
+                        <strong className="text-[#2069BA]">
+                          Research Focus:
+                        </strong>{" "}
                         {survey.researchPurpose.length > 60
                           ? survey.researchPurpose.substring(0, 60) + "..."
                           : survey.researchPurpose}
                       </p>
                     )}
-                    {survey.sponsorshipAmount && (
+                    {!!survey.pointsReward && (
                       <p>
-                        <strong>Sponsorship:</strong> $
-                        {survey.sponsorshipAmount}
+                        <strong className="text-[#2069BA]">
+                          Points Reward:
+                        </strong>{" "}
+                        <span className="text-green-600 font-bold">
+                          {survey.pointsReward} Points
+                        </span>
                       </p>
                     )}
                   </div>
+                )}
+
+                <div className="flex gap-4 text-sm text-gray-600 mb-4">
+                  <span className="flex items-center">
+                    <span className="font-semibold text-gray-700">Target:</span>
+                    <span className="ml-2 text-[#2069BA] font-bold">
+                      {survey.targetParticipants || 0} participants
+                    </span>
+                  </span>
+                  <span className="flex items-center">
+                    <span className="font-semibold text-gray-700">Reward:</span>
+                    <span className="ml-2 text-green-600 font-bold">
+                      {survey.pointsReward ?? 20} Points
+                    </span>
+                  </span>
                 </div>
-              )}
 
-              {/* Target and Reward Information */}
-              <div className="flex gap-4 text-sm text-gray-600 mb-4">
-                <span className="flex items-center">
-                  <span className="font-medium text-gray-700">Target:</span>
-                  <span className="ml-1 text-blue-600 font-semibold">
-                    {survey.targetParticipants || 0} participants
-                  </span>
-                </span>
-                <span className="flex items-center">
-                  <span className="font-medium text-gray-700">Reward:</span>
-                  <span className="ml-1 text-green-600 font-semibold">
-                    ${survey.reward || "0.00"}
-                  </span>
-                </span>
-              </div>
+                <div className="mb-4">
+                  <div className="flex justify-between text-sm text-gray-600 mb-2">
+                    <span>
+                      Current Participants: {survey.participantsCount || 0}
+                    </span>
+                    <span className="font-semibold">{pct}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div
+                      className={`h-2.5 rounded-full ${
+                        pct >= 100
+                          ? "bg-[#2069BA]"
+                          : pct >= 80
+                          ? "bg-orange-500"
+                          : "bg-green-500"
+                      }`}
+                      style={{ width: `${Math.min(pct, 100)}%` }}
+                    />
+                  </div>
 
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">
-                  {survey.questions ? survey.questions.length + 8 : 8} questions
-                  (includes 8 standardized)
-                </span>
-                <button
-                  onClick={() =>
-                    !survey.alreadySubmitted && handleSurveySelect(survey)
-                  }
-                  className={`px-4 py-1 rounded ${
-                    survey.alreadySubmitted
-                      ? "bg-gray-400 text-white cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 text-white"
-                  }`}
-                  disabled={survey.alreadySubmitted}
-                >
-                  {survey.alreadySubmitted
-                    ? "Already Submitted"
-                    : "Participate"}
-                </button>
+                  {isCompleted && survey.completedAt && (
+                    <div className="text-sm text-green-600 font-medium mt-2">
+                      Survey completed on{" "}
+                      {new Date(survey.completedAt).toLocaleDateString()}
+                    </div>
+                  )}
+                  {isQuotaReached &&
+                    !isCompleted &&
+                    survey.status === "active" && (
+                      <div className="text-sm text-orange-600 font-medium mt-2">
+                        Target quota reached - closing soon
+                      </div>
+                    )}
+                  {!isQuotaReached && pct >= 80 && (
+                    <div className="text-sm text-orange-600 font-medium mt-2">
+                      Approaching quota - limited spots
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">
+                    {survey.questions ? survey.questions.length : 0} questions
+                  </span>
+                  <button
+                    onClick={() => canParticipate && handleSurveySelect(survey)}
+                    className={`px-6 py-2 rounded-xl font-semibold transition-all duration-200 ${
+                      !canParticipate
+                        ? "bg-gray-400 text-white cursor-not-allowed"
+                        : "bg-[#2069BA] hover:bg-[#1e40af] text-white shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                    }`}
+                    disabled={!canParticipate}
+                    title={
+                      isCompleted
+                        ? "This survey has been completed"
+                        : survey.alreadySubmitted
+                        ? "You have already submitted this survey"
+                        : survey.status === "paused"
+                        ? "This survey is currently paused"
+                        : "Click to participate"
+                    }
+                  >
+                    {isCompleted
+                      ? "Completed"
+                      : survey.alreadySubmitted
+                      ? "Already Submitted"
+                      : survey.status === "paused"
+                      ? "Paused"
+                      : "Participate"}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

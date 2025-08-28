@@ -110,7 +110,7 @@ const LicensePayments = () => {
         amount: plan.price,
         domain: window.location.origin,
         successUrl: `${window.location.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}&plan_id=${plan.id}&points=${plan.points}&amount=${plan.price}`,
-        cancelUrl: `${window.location.origin}/institution/licenses`,
+        cancelUrl: `${window.location.origin}/business/licenses`,
       };
 
       console.log("Sending request:", requestData);
@@ -146,8 +146,8 @@ const LicensePayments = () => {
     }
   };
 
-  if (!institution || institution.type !== "institution") {
-    return <div className="text-center py-8">Institution access required</div>;
+  if (!institution || institution.type !== "business") {
+    return <div className="text-center py-8">Business access required</div>;
   }
 
   return (
@@ -190,8 +190,7 @@ const LicensePayments = () => {
                     tools
                   </p>
                   <p>
-                    • Higher point packages provide better value for research
-                    institutions
+                    • Higher point packages provide better value for businesses
                   </p>
                 </div>
               </div>

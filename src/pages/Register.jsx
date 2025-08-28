@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppContext } from "../context/AppContext";
 import CheckEmail from "../components/CheckEmail";
+import MainButton from "../components/MainButton";
 
 const Register = () => {
   const { createAccount } = useAppContext();
@@ -38,7 +39,7 @@ const Register = () => {
       newErrors.confirmPassword = "Passwords do not match";
     }
 
-    if (userType === "institution") {
+    if (userType === "business") {
       if (!formData.organizationType)
         newErrors.organizationType = "Organization type is required";
     }
@@ -55,45 +56,52 @@ const Register = () => {
       return;
     }
 
-    // Save to localStorage
-    if (userType === "user") {
-      const newUser = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        phone: formData.phone,
-        createdAt: new Date().toISOString(),
-        isActive: true,
-        type: "user",
-      };
-      const response = await createAccount(newUser);
-      console.log(response);
-      if (!response.success) {
-        toast.error("Sign Up Failed");
+    setIsSubmitting(true); // Set loading state to true
+
+    try {
+      // Save to localStorage
+      if (userType === "user") {
+        const newUser = {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          createdAt: new Date().toISOString(),
+          isActive: true,
+          type: "user",
+        };
+        const response = await createAccount(newUser);
+        if (!response.success) {
+          toast.error("Sign Up Failed");
+        } else {
+          // navigate("/checkemail");
+          setEmailSend(true);
+        }
       } else {
-        // navigate("/checkemail");
-        setEmailSend(true);
+        const newBusiness = {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone,
+          organizationType: formData.organizationType,
+          address: formData.address,
+          createdAt: new Date().toISOString(),
+          isActive: true,
+          type: "business",
+        };
+        const response = await createAccount(newBusiness);
+        if (!response.success) {
+          toast.error("Sign Up Failed");
+        } else {
+          // navigate("/checkemail");
+          setEmailSend(true);
+        }
       }
-    } else {
-      const newInstitution = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        phone: formData.phone,
-        organizationType: formData.organizationType,
-        address: formData.address,
-        createdAt: new Date().toISOString(),
-        isActive: false,
-        type: "institution",
-      };
-      const response = await createAccount(newInstitution);
-      console.log(response);
-      if (!response.success) {
-        toast.error("Sign Up Failed");
-      } else {
-        // navigate("/checkemail");
-        setEmailSend(true);
-      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      toast.error("An error occurred during registration");
+    } finally {
+      setIsSubmitting(false); // Reset loading state regardless of outcome
     }
   };
 
@@ -110,7 +118,7 @@ const Register = () => {
             Or{" "}
             <a
               href="/login"
-              className="font-medium text-blue-600 hover:text-blue-500"
+              className="text-[#2069BA] hover:text-[#1e40af] font-semibold"
             >
               sign in to existing account
             </a>
@@ -127,24 +135,24 @@ const Register = () => {
                 <button
                   type="button"
                   onClick={() => setUserType("user")}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
                     userType === "user"
-                      ? "bg-blue-100 text-blue-800"
-                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                      ? "bg-[#2069BA] text-white shadow-lg"
+                      : "bg-gray-100 text-gray-800 hover:bg-gray-200 hover:shadow-md"
                   }`}
                 >
                   Individual User
                 </button>
                 <button
                   type="button"
-                  onClick={() => setUserType("institution")}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    userType === "institution"
-                      ? "bg-blue-100 text-blue-800"
-                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                  onClick={() => setUserType("business")}
+                  className={`px-6 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+                    userType === "business"
+                      ? "bg-[#2069BA] text-white shadow-lg"
+                      : "bg-gray-100 text-gray-800 hover:bg-gray-200 hover:shadow-md"
                   }`}
                 >
-                  Research Institution
+                  Business
                 </button>
               </div>
             </div>
@@ -155,7 +163,7 @@ const Register = () => {
                   htmlFor="name"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  {userType === "user" ? "Full Name" : "Institution Name"} *
+                  {userType === "user" ? "Full Name" : "Business Name"} *
                 </label>
                 <div className="mt-1">
                   <input
@@ -166,7 +174,7 @@ const Register = () => {
                     onChange={handleChange}
                     className={`appearance-none block w-full px-3 py-2 border ${
                       errors.name ? "border-red-300" : "border-gray-300"
-                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    } rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2069BA] focus:border-[#2069BA] sm:text-sm transition-all duration-200`}
                   />
                   {errors.name && (
                     <p className="mt-1 text-sm text-red-600">{errors.name}</p>
@@ -191,7 +199,7 @@ const Register = () => {
                     onChange={handleChange}
                     className={`appearance-none block w-full px-3 py-2 border ${
                       errors.email ? "border-red-300" : "border-gray-300"
-                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    } rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2069BA] focus:border-[#2069BA] sm:text-sm transition-all duration-200`}
                   />
                   {errors.email && (
                     <p className="mt-1 text-sm text-red-600">{errors.email}</p>
@@ -216,7 +224,7 @@ const Register = () => {
                       onChange={handleChange}
                       className={`appearance-none block w-full px-3 py-2 border ${
                         errors.password ? "border-red-300" : "border-gray-300"
-                      } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      } rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2069BA] focus:border-[#2069BA] sm:text-sm transition-all duration-200`}
                     />
                     {errors.password && (
                       <p className="mt-1 text-sm text-red-600">
@@ -244,7 +252,7 @@ const Register = () => {
                         errors.confirmPassword
                           ? "border-red-300"
                           : "border-gray-300"
-                      } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      } rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2069BA] focus:border-[#2069BA] sm:text-sm transition-all duration-200`}
                     />
                     {errors.confirmPassword && (
                       <p className="mt-1 text-sm text-red-600">
@@ -269,12 +277,12 @@ const Register = () => {
                     type="tel"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2069BA] focus:border-[#2069BA] sm:text-sm transition-all duration-200"
                   />
                 </div>
               </div>
 
-              {userType === "institution" && (
+              {userType === "business" && (
                 <>
                   <div>
                     <label
@@ -293,7 +301,7 @@ const Register = () => {
                           errors.organizationType
                             ? "border-red-300"
                             : "border-gray-300"
-                        } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                        } rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2069BA] focus:border-[#2069BA] sm:text-sm transition-all duration-200`}
                       >
                         <option value="">Select organization type</option>
                         <option value="University">University</option>
@@ -325,7 +333,7 @@ const Register = () => {
                         rows="3"
                         value={formData.address}
                         onChange={handleChange}
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2069BA] focus:border-[#2069BA] sm:text-sm transition-all duration-200"
                       />
                     </div>
                   </div>
@@ -337,7 +345,7 @@ const Register = () => {
                   id="terms"
                   name="terms"
                   type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-[#2069BA] focus:ring-[#2069BA] border-gray-300 rounded"
                   required
                 />
                 <label
@@ -345,24 +353,29 @@ const Register = () => {
                   className="ml-2 block text-sm text-gray-900"
                 >
                   I agree to the{" "}
-                  <a href="#" className="text-blue-600 hover:text-blue-500">
+                  <a
+                    href="#"
+                    className="text-[#2069BA] hover:text-[#1e40af] font-semibold"
+                  >
                     Terms of Service
                   </a>{" "}
                   and{" "}
-                  <a href="#" className="text-blue-600 hover:text-blue-500">
+                  <a
+                    href="#"
+                    className="text-[#2069BA] hover:text-[#1e40af] font-semibold"
+                  >
                     Privacy Policy
                   </a>
                 </label>
               </div>
 
               <div>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                <MainButton
+                  isLoading={isSubmitting}
+                  loadingText="Submitting..."
                 >
-                  {isSubmitting ? "Submitting..." : "Register"}
-                </button>
+                  Register
+                </MainButton>
               </div>
             </form>
           </div>

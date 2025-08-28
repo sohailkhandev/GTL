@@ -12,6 +12,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "@/config/Firebase";
 import { useAppContext } from "@/context/AppContext";
+import ProgressiveJackpot from "../../components/ProgressiveJackpot";
 
 const MyActivity = () => {
   const [activeTab, setActiveTab] = useState("surveys");
@@ -65,7 +66,7 @@ const MyActivity = () => {
 
         const userProposals = snapshot.docs.map((docSnap) => ({
           id: docSnap.id,
-          institutionName: "Dummy Institute", // placeholder
+          businessName: "Dummy Business", // placeholder
           ...docSnap.data(),
         }));
 
@@ -557,7 +558,7 @@ const MyActivity = () => {
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-gray-900">Institution:</h4>
+                  <h4 className="font-medium text-gray-900">Business:</h4>
                   <p className="text-gray-700">
                     {selectedProposal.institutionName}
                   </p>

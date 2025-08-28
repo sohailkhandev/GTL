@@ -18,7 +18,7 @@ export const POINT_CONSTANTS = {
   POINT_TO_DOLLAR: 0.01, // 1 point = $0.01
   SURVEY_RESPONSE_COST: 50, // 50 points ($0.50) per response
   USER_EARNINGS_PER_RESPONSE: 20, // 20 points ($0.20) per response
-  JACKPOT_CONTRIBUTION: 10, // 10 points ($0.10) per response
+  JACKPOT_CONTRIBUTION: 10, // 10 points ($0.10) per response to progressive reward
   ADMIN_FEE: 20, // 20 points ($0.20) per response
   MIN_REDEMPTION: 2000, // 2,000 points minimum for gift card redemption
 };
@@ -195,14 +195,14 @@ export const processSurveyResponse = async (userId, companyId, surveyId) => {
       throw new Error("Failed to add points to user");
     }
 
-    // 2. Create jackpot entry (10 points contribution)
+    // 2. Create progressive reward entry (10 points contribution)
     const jackpotEntry = await addDoc(collection(db, "jackpotEntries"), {
       userId,
       surveyId,
       companyId,
       points: POINT_CONSTANTS.JACKPOT_CONTRIBUTION,
       timestamp: new Date().toISOString(),
-      status: "pending", // Will be processed by jackpot system
+      status: "pending", // Will be processed by progressive reward system
     });
 
     // 3. Record the survey response for analytics

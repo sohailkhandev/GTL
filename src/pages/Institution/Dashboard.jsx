@@ -6,7 +6,7 @@ import { db, functions } from "@/config/Firebase";
 import { useAppContext } from "@/context/AppContext";
 import { Link } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
-import InstitutionPoints from "../../components/InstitutionPoints";
+import BusinessPoints from "../../components/InstitutionPoints";
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -27,7 +27,7 @@ const Dashboard = () => {
   const { user: institution } = useAppContext();
 
   useEffect(() => {
-    if (!institution || institution.type !== "institution") return;
+    if (!institution || institution.type !== "business") return;
 
     // const fetchData = async () => {
     //   try {
@@ -247,8 +247,8 @@ const Dashboard = () => {
     return new Date(date).toLocaleString();
   };
 
-  if (!institution || institution.type !== "institution") {
-    return <div className="text-center py-8">Institution access required</div>;
+  if (!institution || institution.type !== "business") {
+    return <div className="text-center py-8">Business access required</div>;
   }
 
   if (loading) {
@@ -400,7 +400,7 @@ const Dashboard = () => {
                     {stats.surveys || 0}
                   </div>
                   <Link
-                    to="/institution/surveys"
+                    to="/business/surveys"
                     className="ml-2 text-sm font-medium text-green-600 hover:text-green-500"
                   >
                     Manage
@@ -439,7 +439,7 @@ const Dashboard = () => {
                     {stats.responses || 0}
                   </div>
                   <Link
-                    to="/institution/survey-responses"
+                    to="/business/survey-responses"
                     className="ml-2 text-sm font-medium text-orange-600 hover:text-orange-500"
                   >
                     View All
@@ -452,7 +452,7 @@ const Dashboard = () => {
 
         {/* Active Points Card */}
         <div className="lg:col-span-2">
-          <InstitutionPoints />
+          <BusinessPoints />
         </div>
       </div>
 
@@ -511,14 +511,14 @@ const Dashboard = () => {
             </h3>
             <div className="flex space-x-2">
               <Link
-                to="/institution/surveys"
+                to="/business/surveys"
                 className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-600 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Manage All Surveys
               </Link>
               <Link
-                to="/institution/survey-responses"
-                className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-orange-600 bg-orange-100 hover:bg-orange-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                to="/business/survey-responses"
+                className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-orange-600 bg-orange-100 hover:bg-orange-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 View Responses
               </Link>
@@ -563,7 +563,7 @@ const Dashboard = () => {
             <div className="text-center py-4">
               <p className="text-gray-500 mb-3">No surveys created yet</p>
               <Link
-                to="/institution/surveys"
+                to="/business/surveys"
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 Create Your First Survey
@@ -573,7 +573,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Quick Actions and Institution Status */}
+      {/* Quick Actions and Business Status */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
@@ -584,25 +584,25 @@ const Dashboard = () => {
           <div className="px-4 py-5 sm:p-6">
             <div className="grid grid-cols-1 gap-4">
               <Link
-                to="/institution/search"
+                to="/business/search"
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Search Database
               </Link>
               <Link
-                to="/institution/licenses"
+                to="/business/licenses"
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 Purchase Points
               </Link>
               <Link
-                to="/institution/surveys"
+                to="/business/surveys"
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 Create Surveys
               </Link>
               <Link
-                to="/institution/survey-responses"
+                to="/business/survey-responses"
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
               >
                 View Responses
@@ -614,7 +614,7 @@ const Dashboard = () => {
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
             <h3 className="text-lg leading-6 font-medium text-gray-900">
-              Institution Status
+              Business Status
             </h3>
           </div>
           <div className="px-4 py-5 sm:p-6">
@@ -655,14 +655,14 @@ const Dashboard = () => {
                   }`}
                 >
                   {institution.isActive
-                    ? "Verified Institution"
+                    ? "Verified Business"
                     : "Pending Verification"}
                 </h3>
                 <div className="mt-2 text-sm text-gray-700">
                   <p>
                     {institution.isActive
-                      ? "Your institution has been verified and has full access to all features."
-                      : "Your institution is pending verification. Some features may be limited."}
+                      ? "Your business has been verified and has full access to all features."
+                      : "Your business is pending verification. Some features may be limited."}
                   </p>
                 </div>
                 {!institution.isActive && (

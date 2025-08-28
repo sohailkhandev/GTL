@@ -14,7 +14,7 @@ import {
 
 const LicenseLogs = () => {
   const [licenses, setLicenses] = useState([]);
-  const [institutions, setInstitutions] = useState([]);
+  const [institutiones, setBusinesses] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -53,10 +53,10 @@ const LicenseLogs = () => {
           ...institutionDoc.data(),
         };
       });
-      const fetchedInstitutions = await Promise.all(institutionsPromises);
+      const fetchedBusinesses = await Promise.all(institutionsPromises);
 
       setLicenses(fetchedLicenses);
-      setInstitutions(fetchedInstitutions);
+      setBusinesses(fetchedBusinesses);
     } catch (error) {
       console.error("Error fetching license data:", error);
     } finally {
@@ -65,7 +65,7 @@ const LicenseLogs = () => {
   };
 
   const filteredLicenses = licenses.filter((license) => {
-    const institution = institutions.find((i) => i.id === license.userId);
+    const institution = institutiones.find((i) => i.id === license.userId);
     const matchesSearch =
       institution &&
       (institution.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -89,8 +89,8 @@ const LicenseLogs = () => {
   );
   const totalPages = Math.ceil(filteredLicenses.length / itemsPerPage);
 
-  const getInstitutionForLicense = (institutionId) => {
-    return institutions.find((i) => i.id === institutionId);
+  const getBusinessForLicense = (institutionId) => {
+    return institutiones.find((i) => i.id === institutionId);
   };
 
   if (!admin || admin.type !== "admin") {
@@ -114,7 +114,7 @@ const LicenseLogs = () => {
             <div className="mt-3 md:mt-0 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
               <input
                 type="text"
-                placeholder="Search institutions..."
+                placeholder="Search businesses..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -130,7 +130,7 @@ const LicenseLogs = () => {
                   scope="col"
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
-                  Institution
+                  Business
                 </th>
                 <th
                   scope="col"
@@ -161,7 +161,7 @@ const LicenseLogs = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {currentLicenses.length > 0 ? (
                 currentLicenses.map((license) => {
-                  const institution = getInstitutionForLicense(license.userId);
+                  const institution = getBusinessForLicense(license.userId);
                   const isActive = license.status === "completed";
 
                   return (
@@ -175,7 +175,7 @@ const LicenseLogs = () => {
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {institution?.name || "Unknown Institution"}
+                              {institution?.name || "Unknown Business"}
                             </div>
                             <div className="text-sm text-gray-500">
                               {institution?.email || "No email"}

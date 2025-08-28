@@ -3,16 +3,25 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "@/assets/logo.png";
 import { useAppContext } from "../context/AppContext";
+import DangerButton from "./DangerButton";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const navigate = useNavigate();
   const { user, logOut } = useAppContext();
 
-  const handleLogout = () => {
-    logOut();
-    navigate("/");
-    setIsOpen(false);
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logOut();
+      navigate("/login");
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -41,6 +50,9 @@ const Navbar = () => {
 
               {user.type === "user" && (
                 <>
+                  <Link to="/dashboard" className="hover:underline">
+                    Dashboard
+                  </Link>
                   <Link to="/participate" className="hover:underline">
                     Participate
                   </Link>
@@ -56,21 +68,21 @@ const Navbar = () => {
                 </>
               )}
 
-              {user.type === "institution" && (
+              {user.type === "business" && (
                 <>
-                  <Link to="/institution/dashboard" className="hover:underline">
+                  <Link to="/business/dashboard" className="hover:underline">
                     Dashboard
                   </Link>
-                  <Link to="/institution/search" className="hover:underline">
+                  <Link to="/business/search" className="hover:underline">
                     Search
                   </Link>
                   <Link
-                    to="/institution/purchasehistory"
+                    to="/business/purchasehistory"
                     className="hover:underline"
                   >
                     Purchase History
                   </Link>
-                  <Link to="/institution/licenses" className="hover:underline">
+                  <Link to="/business/licenses" className="hover:underline">
                     Purchase Points
                   </Link>
                 </>
@@ -78,11 +90,14 @@ const Navbar = () => {
 
               {user.type === "admin" && (
                 <>
+                  <Link to="/admin" className="hover:underline">
+                    Dashboard
+                  </Link>
                   <Link to="/admin/users" className="hover:underline">
                     Users
                   </Link>
-                  <Link to="/admin/institutions" className="hover:underline">
-                    Institutions
+                  <Link to="/admin/businesses" className="hover:underline">
+                    Businesses
                   </Link>
                   <Link to="/admin/surveys" className="hover:underline">
                     Surveys
@@ -96,19 +111,28 @@ const Navbar = () => {
               <Link to="/mypage" className="hover:underline">
                 My Account
               </Link>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-white cursor-pointer"
-              >
+              <DangerButton onClick={handleLogout} isLoading={isLoggingOut}>
                 Logout
-              </button>
+              </DangerButton>
             </>
           ) : (
             <>
-              <Link to="/login" className="hover:underline">
+              <Link
+                to="/"
+                className="text-[#2069BA] font-bold hover:text-[#1e40af] transition-colors duration-200"
+              >
+                Home
+              </Link>
+              <Link
+                to="/login"
+                className="bg-[#2069BA] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#1e40af] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+              >
                 Login
               </Link>
-              <Link to="/register" className="hover:underline">
+              <Link
+                to="/register"
+                className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+              >
                 Register
               </Link>
             </>
@@ -128,17 +152,14 @@ const Navbar = () => {
 
                 {user.type === "user" && (
                   <>
+                    <Link onClick={() => setIsOpen(false)} to="/dashboard">
+                      Dashboard
+                    </Link>
                     <Link onClick={() => setIsOpen(false)} to="/participate">
                       Participate
                     </Link>
                     <Link onClick={() => setIsOpen(false)} to="/activity">
                       My Activity
-                    </Link>
-                    <Link
-                      onClick={() => setIsOpen(false)}
-                      to="/shipping-address"
-                    >
-                      DNA Kit
                     </Link>
                     <Link onClick={() => setIsOpen(false)} to="/notifications">
                       Notifications
@@ -146,28 +167,28 @@ const Navbar = () => {
                   </>
                 )}
 
-                {user.type === "institution" && (
+                {user.type === "business" && (
                   <>
                     <Link
                       onClick={() => setIsOpen(false)}
-                      to="/institution/dashboard"
+                      to="/business/dashboard"
                     >
                       Dashboard
                     </Link>
                     <Link
                       onClick={() => setIsOpen(false)}
-                      to="/institution/search"
+                      to="/business/search"
                     >
                       Search
                     </Link>
                     <Link
-                      to="/institution/purchasehistory"
+                      to="/business/purchasehistory"
                       onClick={() => setIsOpen(false)}
                     >
                       Purchase History
                     </Link>
                     <Link
-                      to="/institution/licenses"
+                      to="/business/licenses"
                       onClick={() => setIsOpen(false)}
                     >
                       Purchase Points
@@ -177,14 +198,17 @@ const Navbar = () => {
 
                 {user.type === "admin" && (
                   <>
+                    <Link onClick={() => setIsOpen(false)} to="/admin">
+                      Dashboard
+                    </Link>
                     <Link onClick={() => setIsOpen(false)} to="/admin/users">
                       Users
                     </Link>
                     <Link
                       onClick={() => setIsOpen(false)}
-                      to="/admin/institutions"
+                      to="/admin/businesses"
                     >
-                      Institutions
+                      Businesses
                     </Link>
                     <Link onClick={() => setIsOpen(false)} to="/admin/surveys">
                       Surveys
@@ -198,20 +222,36 @@ const Navbar = () => {
                 <Link onClick={() => setIsOpen(false)} to="/mypage">
                   My Account
                 </Link>
-                <button
+                <DangerButton
                   onClick={handleLogout}
-                  className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-white cursor-pointer"
+                  isLoading={isLoggingOut}
+                  loadingText="Logging out..."
                 >
                   Logout
-                </button>
+                </DangerButton>
               </>
             ) : (
               <>
-                <Link onClick={() => setIsOpen(false)} to="/login">
-                  Login
+                <Link
+                  onClick={() => setIsOpen(false)}
+                  to="/"
+                  className="text-[#2069BA] font-bold"
+                >
+                  🏠 Home
                 </Link>
-                <Link onClick={() => setIsOpen(false)} to="/register">
-                  Register
+                <Link
+                  onClick={() => setIsOpen(false)}
+                  to="/login"
+                  className="bg-[#2069BA] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#1e40af] transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  🔐 Login
+                </Link>
+                <Link
+                  onClick={() => setIsOpen(false)}
+                  to="/register"
+                  className="bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                >
+                  ✨ Register
                 </Link>
               </>
             )}

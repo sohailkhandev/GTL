@@ -5,7 +5,7 @@ import { FaCoins, FaInfoCircle } from "react-icons/fa";
 import { getUserPoints, POINT_CONSTANTS } from "../services/pointsService";
 import { useAppContext } from "../context/AppContext";
 
-const InstitutionPoints = () => {
+const BusinessPoints = () => {
   const [currentPoints, setCurrentPoints] = useState(0);
   const [loading, setLoading] = useState(true);
   const { user } = useAppContext();
@@ -115,7 +115,7 @@ const InstitutionPoints = () => {
             <strong>Action Required:</strong> You need at least{" "}
             {POINT_CONSTANTS.SURVEY_RESPONSE_COST} points to create surveys.
             <a
-              href="/institution/licenses"
+              href="/business/licenses"
               className="text-blue-600 hover:text-blue-800 underline ml-1"
             >
               Purchase points now
@@ -127,4 +127,4 @@ const InstitutionPoints = () => {
   );
 };
 
-export default InstitutionPoints;
+export default BusinessPoints;

@@ -1,0 +1,5 @@
+---
+description: Don't use emojis or make look like ai created this project. Always generate code as a developer write or do coding
+globs:
+alwaysApply: true
+---

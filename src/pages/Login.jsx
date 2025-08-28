@@ -2,11 +2,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
+import MainButton from "../components/MainButton";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { signIn } = useAppContext();
 
@@ -19,12 +21,21 @@ const Login = () => {
       return;
     }
 
-    const response = await signIn(email, password);
-    console.log(response);
-    if (response.success) {
-      navigate("/");
-    } else {
-      setError(response.message || "Invalid credentials. Please try again.");
+    setIsLoading(true);
+
+    try {
+      const response = await signIn(email, password);
+      console.log(response);
+      if (response.success) {
+        navigate("/");
+      } else {
+        setError(response.message || "Invalid credentials. Please try again.");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("An error occurred during login. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -79,7 +90,7 @@ const Login = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2069BA] focus:border-[#2069BA] sm:text-sm transition-all duration-200"
                 />
               </div>
             </div>
@@ -100,18 +111,15 @@ const Login = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#2069BA] focus:border-[#2069BA] sm:text-sm transition-all duration-200"
                 />
               </div>
             </div>
 
             <div>
-              <button
-                type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
+              <MainButton isLoading={isLoading} loadingText="Signing in...">
                 Sign in
-              </button>
+              </MainButton>
             </div>
           </form>
 

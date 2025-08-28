@@ -3,6 +3,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
+import { getDocumentsByFilters } from "../../utils/database.utils";
+import PointsRedemption from "../../components/PointsRedemption";
+import ProgressiveJackpot from "../../components/ProgressiveJackpot";
+import PrivacyOptOut from "../../components/PrivacyOptOut";
 
 const MyPage = () => {
   const [userData, setUserData] = useState({
@@ -140,7 +144,7 @@ const MyPage = () => {
             )}
           </div>
 
-          {user.type === "institution" && (
+          {user.type === "business" && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -270,6 +274,16 @@ const MyPage = () => {
             </>
           )}
         </div>
+      </div>
+
+      {/* Privacy Settings */}
+      <div className="mt-8">
+        <PrivacyOptOut />
+      </div>
+
+      {/* Points Redemption */}
+      <div className="mt-8">
+        <PointsRedemption />
       </div>
     </div>
   );

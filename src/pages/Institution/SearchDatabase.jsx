@@ -14,7 +14,6 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import UserPoints from "../../components/UserPoints";
 
 const SearchDatabase = () => {
   const [searchCriteria, setSearchCriteria] = useState({
@@ -61,7 +60,7 @@ const SearchDatabase = () => {
   }, []);
 
   const handleSearch = async () => {
-    if (!user || user.type !== "institution") return;
+    if (!user || user.type !== "business") return;
 
     if (!user.isActive) {
       alert("Your account is inactive. You cannot search the database.");
@@ -101,7 +100,7 @@ const SearchDatabase = () => {
 
   // ✅ Contact user
   const handleContactUser = (userId, serveyId) => {
-    navigate("/institution/proposals", {
+    navigate("/business/proposals", {
       state: {
         selectedUser: { userId },
         serveyId: { serveyId },
@@ -110,13 +109,13 @@ const SearchDatabase = () => {
     });
   };
 
-  if (!user || user.type !== "institution") {
+  if (!user || user.type !== "business") {
     return (
       <div className="max-w-4xl mx-auto py-8 text-center">
         <h2 className="text-2xl font-semibold mb-4">
-          Institution access required
+          Business access required
         </h2>
-        <p>Please login with an institution account to access this feature.</p>
+        <p>Please login with a business account to access this feature.</p>
       </div>
     );
   }
@@ -134,7 +133,6 @@ const SearchDatabase = () => {
 
   return (
     <div className="max-w-6xl mx-auto py-8">
-      <UserPoints user={user} />
       <h2 className="text-2xl font-semibold mb-6">Search Database</h2>
 
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">

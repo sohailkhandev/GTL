@@ -3,28 +3,31 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useState,
+  useEffect,
   useCallback,
 } from "react";
-// import axios from "axios";
-
+import { auth } from "@/config/Firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
+  sendEmailVerification,
   sendPasswordResetEmail,
-  EmailAuthProvider,
   reauthenticateWithCredential,
+  EmailAuthProvider,
   updateEmail,
   updatePassword,
-  sendEmailVerification,
 } from "firebase/auth";
+import {
+  getDocumentById,
+  addDocumentWithId,
+  updateDocument,
+} from "@/utils/database.utils";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/config/Firebase";
 
-import { getDoc, doc, setDoc, updateDoc, onSnapshot } from "firebase/firestore";
-
-import { db, auth } from "@/config/Firebase";
 import { toast } from "react-toastify";
 
 const AppContext = createContext(); // creating context
@@ -38,16 +41,17 @@ export function UseAppContextProvider({ children }) {
       const data = await signInWithEmailAndPassword(auth, email, password);
       console.log(data);
 
-      const usersCollection = doc(db, "users/" + data.user.uid);
-      let snapshot = await getDoc(usersCollection);
-      if (snapshot.exists) {
-        const snapshotvalue = snapshot.data();
+      const userData = await getDocumentById({
+        collectionName: "users",
+        documentId: data.user.uid,
+      });
 
-        if (snapshotvalue.type === "admin") {
-          setUser(snapshotvalue);
+      if (userData) {
+        if (userData.type === "admin") {
+          setUser(userData);
           return {
             success: true,
-            user: snapshotvalue,
+            user: userData,
           };
         } else {
           if (!data.user.emailVerified) {
@@ -61,10 +65,10 @@ export function UseAppContextProvider({ children }) {
                 "Your Email Is Not Verified, We have send email verification link to your email address to verify.",
             };
           } else {
-            setUser(snapshotvalue);
+            setUser(userData);
             return {
               success: true,
-              user: snapshotvalue,
+              user: userData,
             };
           }
         }
@@ -87,6 +91,24 @@ export function UseAppContextProvider({ children }) {
     return await signOut(auth);
   }
 
+  async function refreshUserData() {
+    if (auth.currentUser) {
+      try {
+        const userData = await getDocumentById({
+          collectionName: "users",
+          documentId: auth.currentUser.uid,
+        });
+        if (userData) {
+          setUser(userData);
+          return userData;
+        }
+      } catch (error) {
+        console.error("Error refreshing user data:", error);
+      }
+    }
+    return null;
+  }
+
   async function createAccount(customerData) {
     try {
       // 1. Create user with email/password
@@ -97,7 +119,6 @@ export function UseAppContextProvider({ children }) {
       );
 
       const user = userCredential.user;
-      const userRef = doc(db, "users", user.uid);
 
       // 2. Prepare user data
       const userData = {
@@ -107,16 +128,22 @@ export function UseAppContextProvider({ children }) {
         type: customerData.type,
         phone: customerData.phone || "",
         createdAt: new Date().toISOString(),
-        isActive: false,
-        ...(customerData.type === "institution" && {
+        isActive: true,
+        ...(customerData.type === "user" && {
+          member: "not a member",
+        }),
+        ...(customerData.type === "business" && {
           organizationType: customerData.organizationType,
           address: customerData.address || "",
           points: 0,
         }),
       };
 
-      // 3. Save user data to Firestore
-      await setDoc(userRef, userData);
+      await addDocumentWithId({
+        collectionName: "users",
+        data: userData,
+        customId: user.uid,
+      });
 
       // 4. Send verification email
       await sendEmailVerification(user, {
@@ -190,30 +217,37 @@ export function UseAppContextProvider({ children }) {
       }
 
       // Update the user document in Firestore
-      const userRef = doc(db, "users", loggedUser.uid);
-
-      // Get current user data from Firestore first
-      const userDoc = await getDoc(userRef);
-      const currentUserData = userDoc.data();
+      const currentUserData = await getDocumentById({
+        collectionName: "users",
+        documentId: loggedUser.uid,
+      });
 
       if (currentUserData?.type === "user") {
-        await updateDoc(userRef, {
-          email: email || loggedUser.email,
-          name: name || currentUserData.name,
-          uid: loggedUser.uid,
-          type: currentUserData.type,
-          phone: phone || currentUserData.phone,
+        await updateDocument({
+          collectionName: "users",
+          documentId: loggedUser.uid,
+          data: {
+            email: email || loggedUser.email,
+            name: name || currentUserData.name,
+            uid: loggedUser.uid,
+            type: currentUserData.type,
+            phone: phone || currentUserData.phone,
+          },
         });
       } else {
-        await updateDoc(userRef, {
-          email: email || loggedUser.email,
-          name: name || currentUserData.name,
-          uid: loggedUser.uid,
-          type: currentUserData.type,
-          phone: phone || currentUserData.phone,
-          address: address || currentUserData.address,
-          organizationType:
-            organizationType || currentUserData.organizationType,
+        await updateDocument({
+          collectionName: "users",
+          documentId: loggedUser.uid,
+          data: {
+            email: email || loggedUser.email,
+            name: name || currentUserData.name,
+            uid: loggedUser.uid,
+            type: currentUserData.type,
+            phone: phone || currentUserData.phone,
+            address: address || currentUserData.address,
+            organizationType:
+              organizationType || currentUserData.organizationType,
+          },
         });
       }
 
@@ -282,11 +316,14 @@ export function UseAppContextProvider({ children }) {
             usersDocRef,
             (snapshot) => {
               const data = snapshot.data();
+              console.log("User document data:", data);
 
-              if (data?.uid) {
+              if (data && data.uid) {
+                console.log("Setting user state:", data);
                 setUser(data);
                 setLoading(false);
               } else {
+                console.error("User document missing uid:", data);
                 setLoading(false);
                 logOut();
               }
@@ -334,6 +371,7 @@ export function UseAppContextProvider({ children }) {
         setResetPasswordLink,
         updateAuthPassword,
         updateAuthProfile,
+        refreshUserData,
       }}
     >
       {children}

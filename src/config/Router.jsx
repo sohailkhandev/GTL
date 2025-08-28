@@ -21,18 +21,20 @@ import MyActivity from "@/pages/User/MyActivity";
 import Notifications from "@/pages/User/Notifications";
 import MyPage from "@/pages/User/MyPage";
 import ShippingAddress from "@/pages/User/ShippingAddress";
+import Dashboard from "@/pages/User/Dashboard";
 
 // Institution Pages
 import InstitutionDashboard from "@/pages/Institution/Dashboard";
 import SearchDatabase from "@/pages/Institution/SearchDatabase";
 import SendProposals from "@/pages/Institution/SendProposals";
 import LicensePayments from "@/pages/Institution/LicensePayments";
-import InstitutionSurveyBuilder from "@/pages/Institution/SurveyBuilder";
+import BusinessSurveyBuilder from "@/pages/Institution/SurveyBuilder";
 import SurveyResponses from "@/pages/Institution/SurveyResponses";
 
 // Admin Pages
+import AdminDashboard from "@/pages/Admin/Dashboard";
 import UserManagement from "@/pages/Admin/UserManagement";
-import InstitutionManagement from "@/pages/Admin/InstitutionManagement";
+import BusinessManagement from "@/pages/Admin/InstitutionManagement";
 import SurveyBuilder from "@/pages/Admin/SurveyBuilder";
 import LicenseLogs from "@/pages/Admin/LicenseLogs";
 import HowItWorks from "../pages/HowItWorks";
@@ -54,8 +56,9 @@ export default function AppRouter() {
           <Navbar />
           <div className="container mx-auto p-4 flex-grow">
             <Routes>
-              {/* Public Routes */}
+              {/* Public Routes - Home is the default landing page */}
               <Route path="/" element={<Home />} />
+              <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
@@ -65,6 +68,16 @@ export default function AppRouter() {
               <Route path="/payment-success" element={<PaymentSuccess />} />
 
               {/* User Routes */}
+              <Route
+                path="/dashboard"
+                element={
+                  user?.type === "user" ? (
+                    <Dashboard />
+                  ) : (
+                    <Navigate to="/login" />
+                  )
+                }
+              />
               <Route
                 path="/participate"
                 element={
@@ -110,11 +123,11 @@ export default function AppRouter() {
                 }
               />
 
-              {/* Institution Routes */}
+              {/* Business Routes */}
               <Route
-                path="/institution/dashboard"
+                path="/business/dashboard"
                 element={
-                  user?.type === "institution" ? (
+                  user?.type === "business" ? (
                     <InstitutionDashboard />
                   ) : (
                     <Navigate to="/login" />
@@ -122,9 +135,9 @@ export default function AppRouter() {
                 }
               />
               <Route
-                path="/institution/search"
+                path="/business/search"
                 element={
-                  user?.type === "institution" ? (
+                  user?.type === "business" ? (
                     <SearchDatabase />
                   ) : (
                     <Navigate to="/login" />
@@ -132,9 +145,9 @@ export default function AppRouter() {
                 }
               />
               <Route
-                path="/institution/proposals"
+                path="/business/proposals"
                 element={
-                  user?.type === "institution" ? (
+                  user?.type === "business" ? (
                     <SendProposals />
                   ) : (
                     <Navigate to="/login" />
@@ -142,9 +155,9 @@ export default function AppRouter() {
                 }
               />
               <Route
-                path="/institution/purchasehistory"
+                path="/business/purchasehistory"
                 element={
-                  user?.type === "institution" ? (
+                  user?.type === "business" ? (
                     <PurchaseHistory />
                   ) : (
                     <Navigate to="/login" />
@@ -152,9 +165,9 @@ export default function AppRouter() {
                 }
               />
               <Route
-                path="/institution/licenses"
+                path="/business/licenses"
                 element={
-                  user?.type === "institution" ? (
+                  user?.type === "business" ? (
                     <LicensePayments />
                   ) : (
                     <Navigate to="/login" />
@@ -162,19 +175,19 @@ export default function AppRouter() {
                 }
               />
               <Route
-                path="/institution/surveys"
+                path="/business/surveys"
                 element={
-                  user?.type === "institution" ? (
-                    <InstitutionSurveyBuilder />
+                  user?.type === "business" ? (
+                    <BusinessSurveyBuilder />
                   ) : (
                     <Navigate to="/login" />
                   )
                 }
               />
               <Route
-                path="/institution/survey-responses"
+                path="/business/survey-responses"
                 element={
-                  user?.type === "institution" ? (
+                  user?.type === "business" ? (
                     <SurveyResponses />
                   ) : (
                     <Navigate to="/login" />
@@ -182,9 +195,9 @@ export default function AppRouter() {
                 }
               />
               <Route
-                path="/institution/paymentsuccess"
+                path="/business/paymentsuccess"
                 element={
-                  user?.type === "institution" ? (
+                  user?.type === "business" ? (
                     <PaymentSuccess />
                   ) : (
                     <Navigate to="/login" />
@@ -193,6 +206,16 @@ export default function AppRouter() {
               />
 
               {/* Admin Routes */}
+              <Route
+                path="/admin"
+                element={
+                  user?.type === "admin" ? (
+                    <AdminDashboard />
+                  ) : (
+                    <Navigate to="/login" />
+                  )
+                }
+              />
               <Route
                 path="/admin/users"
                 element={
@@ -204,10 +227,10 @@ export default function AppRouter() {
                 }
               />
               <Route
-                path="/admin/institutions"
+                path="/admin/businesses"
                 element={
                   user?.type === "admin" ? (
-                    <InstitutionManagement />
+                    <BusinessManagement />
                   ) : (
                     <Navigate to="/login" />
                   )
